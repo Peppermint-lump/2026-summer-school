@@ -2,6 +2,9 @@
 
 状态：MVP `1.0`，依据 `SSOT.md` 与 `ARCHITECTURE.md`。
 
+当前实现的协作者导读见
+[`current-multimodal-emotion-pipeline.zh-CN.md`](current-multimodal-emotion-pipeline.zh-CN.md)。
+
 ## 1. 不可跨越的输入边界
 
 ```text
