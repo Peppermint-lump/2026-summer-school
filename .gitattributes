@@ -2,3 +2,5 @@ third_party/Open-LLM-VTuber/live2d-models/xiaohudie/**/*.png filter=lfs diff=lfs
 third_party/Open-LLM-VTuber/live2d-models/xiaohudie/**/*.moc3 filter=lfs diff=lfs merge=lfs -text
 third_party/Open-LLM-VTuber/live2d-models/felix/**/*.png filter=lfs diff=lfs merge=lfs -text
 third_party/Open-LLM-VTuber/live2d-models/felix/**/*.moc3 filter=lfs diff=lfs merge=lfs -text
+third_party/Open-LLM-VTuber/backgrounds/xiaohudie-day.mp4 filter=lfs diff=lfs merge=lfs -text
+third_party/Open-LLM-VTuber/backgrounds/xiaohudie-night.mp4 filter=lfs diff=lfs merge=lfs -text
