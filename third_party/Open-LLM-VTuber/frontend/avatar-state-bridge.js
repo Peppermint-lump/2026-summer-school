@@ -94,6 +94,27 @@
     ) {
       controller.playSpecialMotion("Greeting", 0);
     }
+    if (
+      payload.motion === "observe" &&
+      controller &&
+      typeof controller.playObserveMotion === "function"
+    ) {
+      controller.playObserveMotion();
+    }
+    if (payload.source === "continuous-video") {
+      const panel = visualStatusPanel();
+      panel.dataset.motion = payload.motion || "idle";
+      const withoutMotion = panel.textContent
+        .split("\n")
+        .filter((line) => !line.startsWith("角色动作："));
+      panel.textContent = withoutMotion
+        .concat(`角色动作：${payload.motion || "idle"}`)
+        .join("\n");
+      panel.title = [
+        panel.title,
+        `角色动作：${payload.motion || "idle"}`,
+      ].filter(Boolean).join("\n");
+    }
     window.dispatchEvent(
       new CustomEvent("vtuber-avatar-state", { detail: payload }),
     );
@@ -126,6 +147,10 @@
         }
       });
     }
+  }
+
+  if (visualDebugEnabled) {
+    window.__applyAvatarStateForDebug = applyAvatarState;
   }
 
   window.WebSocket = AvatarStateWebSocket;

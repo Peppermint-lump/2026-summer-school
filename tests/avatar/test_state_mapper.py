@@ -50,12 +50,9 @@ class AvatarStateMapperTests(unittest.TestCase):
         state = AvatarStateMapper().map(analysis)
 
         by_modality = {
-            suggestion.modality: suggestion
-            for suggestion in state.modality_expressions
+            suggestion.modality: suggestion for suggestion in state.modality_expressions
         }
-        self.assertEqual(
-            by_modality[Modality.TEXT].expression, AvatarExpression.HEART
-        )
+        self.assertEqual(by_modality[Modality.TEXT].expression, AvatarExpression.HEART)
         self.assertEqual(
             by_modality[Modality.AUDIO].expression, AvatarExpression.NEUTRAL
         )
@@ -99,6 +96,96 @@ class AvatarStateMapperTests(unittest.TestCase):
 
         self.assertEqual(state.motion, AvatarMotion.GREETING)
         self.assertEqual(len(state.modality_expressions), 2)
+
+    def test_non_wave_active_actions_select_neutral_observe_motion(self) -> None:
+        fallback_actions = (
+            ActionType.THUMBS_UP,
+            ActionType.CLAP,
+            ActionType.NOD,
+            ActionType.HEAD_SHAKE,
+            ActionType.HANDS_UP,
+            ActionType.POINT,
+            ActionType.OTHER,
+        )
+        for action_type in fallback_actions:
+            with self.subTest(action_type=action_type):
+                video = ModalityEmotion.video_result(
+                    label=EmotionLabel.NEUTRAL,
+                    confidence=0.8,
+                    quality=0.9,
+                    status=EmotionStatus.OK,
+                    observed_actions=(
+                        ObservedAction(
+                            action_type,
+                            0.75,
+                            "visible body movement",
+                        ),
+                    ),
+                )
+                observations = (video,)
+                analysis = EmotionTurnAnalysis(
+                    observations=observations,
+                    fusion=EmotionFusionService().fuse(observations),
+                )
+
+                self.assertEqual(
+                    AvatarStateMapper().map(analysis).motion,
+                    AvatarMotion.OBSERVE,
+                )
+
+    def test_low_confidence_other_action_does_not_move_avatar(self) -> None:
+        video = ModalityEmotion.video_result(
+            label=EmotionLabel.NEUTRAL,
+            confidence=0.8,
+            quality=0.9,
+            status=EmotionStatus.OK,
+            observed_actions=(ObservedAction(ActionType.OTHER, 0.59),),
+        )
+        observations = (video,)
+        analysis = EmotionTurnAnalysis(
+            observations=observations,
+            fusion=EmotionFusionService().fuse(observations),
+        )
+
+        self.assertEqual(AvatarStateMapper().map(analysis).motion, AvatarMotion.IDLE)
+
+    def test_still_never_uses_observe_fallback(self) -> None:
+        video = ModalityEmotion.video_result(
+            label=EmotionLabel.NEUTRAL,
+            confidence=0.9,
+            quality=0.9,
+            status=EmotionStatus.OK,
+            observed_actions=(ObservedAction(ActionType.STILL, 0.99),),
+        )
+        observations = (video,)
+        analysis = EmotionTurnAnalysis(
+            observations=observations,
+            fusion=EmotionFusionService().fuse(observations),
+        )
+
+        self.assertEqual(AvatarStateMapper().map(analysis).motion, AvatarMotion.IDLE)
+
+    def test_wave_has_priority_over_other_fallback(self) -> None:
+        video = ModalityEmotion.video_result(
+            label=EmotionLabel.NEUTRAL,
+            confidence=0.8,
+            quality=0.9,
+            status=EmotionStatus.OK,
+            observed_actions=(
+                ObservedAction(ActionType.OTHER, 0.95),
+                ObservedAction(ActionType.WAVE, 0.75),
+            ),
+        )
+        observations = (video,)
+        analysis = EmotionTurnAnalysis(
+            observations=observations,
+            fusion=EmotionFusionService().fuse(observations),
+        )
+
+        self.assertEqual(
+            AvatarStateMapper().map(analysis).motion,
+            AvatarMotion.GREETING,
+        )
 
     def test_generic_negative_does_not_force_cry_expression(self) -> None:
         observations = (

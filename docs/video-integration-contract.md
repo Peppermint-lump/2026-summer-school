@@ -112,6 +112,11 @@ ModalityEmotion(text/audio/video) -> fusion -> companion -> avatar
 - 最新结果通过已鉴权的 `GET /v1/visual/latest` 暴露给上游适配器；
 - Open-LLM-VTuber 每 0.5 秒检查序号，只推送新结果；
 - `wave` 映射为 `greeting`，相同问候动作默认 5 秒内不重复执行；
+- 置信度不低于 `0.60`、暂时没有专属 Live2D 动作的非静止动作（`thumbs_up`、
+  `clap`、`nod`、`head_shake`、`hands_up`、`point`、`other`）映射为语义中性的
+  `observe`：角色随机先看左或右，再看向另一侧并回到 `Idle`；
+- `still` 和低置信动作均保持 `idle`；`wave` 优先级高于 `observe` 兜底；相同的
+  连续事件采用边沿触发，必须先观察到非该事件才允许再次执行；
 - 说话期间后台观察器仍工作，因此明确动作可以即时驱动 Live2D；说话结束后，
   原有按轮次三模态分析独立完成加权和最终表情；
 - 视觉事件只驱动动作/表情，不触发聊天模型、TTS 或主动语言回复。
@@ -123,4 +128,6 @@ ModalityEmotion(text/audio/video) -> fusion -> companion -> avatar
 - 无有效人脸/画面过暗：低质量不得形成强冲突。
 - Provider 超时：返回 `timeout`，普通对话继续。
 - 正常视频：返回合法 `ModalityEmotion(video)`，不携带 transcript。
+- 高置信非静止动作（无专属动作）：返回 `AvatarState.motion=observe`，前端完成左右观察、参数恢复
+  和 `Idle` 重启，不触发文本回复或 TTS。
 - 清理关闭 retention：当前 turn 媒体在成功和失败后均被删除。

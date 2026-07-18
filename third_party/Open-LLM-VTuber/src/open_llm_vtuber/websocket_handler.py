@@ -67,14 +67,21 @@ def _cooldown_motion(
     motion: str,
     *,
     now: float,
-    last_greeting_at: float,
+    previous_event_motion: Optional[str],
+    last_emitted_at: Dict[str, float],
     cooldown_seconds: float,
-) -> tuple[str, float]:
-    if motion != "greeting":
-        return motion, last_greeting_at
-    if now - last_greeting_at < cooldown_seconds:
-        return "idle", last_greeting_at
-    return "greeting", now
+) -> tuple[str, Optional[str], Dict[str, float]]:
+    """Edge-trigger and cool down non-idle visual motion events."""
+    if motion not in {"greeting", "observe"}:
+        return motion, None, last_emitted_at
+    if motion == previous_event_motion:
+        return "idle", motion, last_emitted_at
+    previous_time = last_emitted_at.get(motion, float("-inf"))
+    if now - previous_time < cooldown_seconds:
+        return "idle", motion, last_emitted_at
+    updated = dict(last_emitted_at)
+    updated[motion] = now
+    return motion, motion, updated
 
 
 class WebSocketHandler:
@@ -373,20 +380,20 @@ class WebSocketHandler:
         if client is None:
             return
         sequence = 0
-        last_greeting_at = float("-inf")
-        cooldown_seconds = float(
-            os.environ.get("VIDEO_ACTION_COOLDOWN_SECONDS", "5")
-        )
+        previous_event_motion: Optional[str] = None
+        last_emitted_at: Dict[str, float] = {}
+        cooldown_seconds = float(os.environ.get("VIDEO_ACTION_COOLDOWN_SECONDS", "5"))
         try:
             while self.client_connections.get(client_uid) is websocket:
                 update = await client.latest_visual(after_sequence=sequence)
                 if update is not None:
                     sequence, result = update
                     now = asyncio.get_running_loop().time()
-                    motion, last_greeting_at = _cooldown_motion(
+                    motion, previous_event_motion, last_emitted_at = _cooldown_motion(
                         result.motion,
                         now=now,
-                        last_greeting_at=last_greeting_at,
+                        previous_event_motion=previous_event_motion,
+                        last_emitted_at=last_emitted_at,
                         cooldown_seconds=cooldown_seconds,
                     )
                     await self._send_visual_emotion(

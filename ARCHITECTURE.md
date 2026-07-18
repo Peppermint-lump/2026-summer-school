@@ -900,6 +900,11 @@ Conflict scenarios default to neutral or mild concern behavior. They must not au
 
 Special motions are separate from emotion states.
 
+Canonical visual-event motions are deterministic and bounded: `wave` may select
+`greeting`, while a high-confidence non-still action without an authored motion may
+select the neutral `observe` fallback. `observe` must preserve the selected expression, must not trigger a
+companion reply, and yields to authored special motions before returning to Idle.
+
 The Idle motion remains active where supported because it drives crying/sleepy loop parameters.
 
 ---

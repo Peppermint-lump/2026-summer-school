@@ -58,8 +58,9 @@ weighted_score = Σ(label_score × modality_weight × reliability)
 
 至少两个可靠模态时，由确定性代码输出最终 label、冲突、策略和
 `AvatarState`。通用 negative 不自动触发 cry；只有高可靠且明确出现哭泣/
-流泪证据时才允许 cry。可靠 wave 可以选择 `greeting` motion，但 wave 仍然
-只计入 video 一次。
+流泪证据时才允许 cry。可靠 wave 可以选择 `greeting` motion；高置信非静止动作
+若没有专属 Live2D 动作，可以选择语义中性的 `observe` 兜底，但不能声称角色
+执行了同义动作。两者仍然只计入 video 一次，`still` 与低置信动作不触发动作。
 
 ## 4. 权威返回对象
 
@@ -82,8 +83,9 @@ Provider 原始响应、base64、媒体路径和 API key 不得进入该返回�
 
 `AvatarState.expression` 是角色表情的权威输入，GLM 回复中的自由表情标签
 不能覆盖它。Open-LLM-VTuber 在 ASR 完成后通过带临时 token 的 loopback
-接口调用中间件，把最终 expression 转为前端 actions，并把 `wave` 对应的
-`greeting` motion 发给动作控制器。陪伴 GLM 只接收规范观察摘要与策略，
+接口调用中间件，把最终 expression 转为前端 actions，并把 `wave`/`other`
+对应的 `greeting`/`observe` motion 发给动作控制器。`observe` 仅执行短暂左右
+观察并恢复 Idle，不产生台词。陪伴 GLM 只接收规范观察摘要与策略，
 不接收原始媒体。
 
 每轮元数据调试输出位于：

@@ -16,7 +16,7 @@ import numpy as np
 from loguru import logger
 
 _EXPRESSIONS = {"neutral", "heart", "star", "cry", "sleepy", "blush", "butterfly"}
-_MOTIONS = {"idle", "greeting"}
+_MOTIONS = {"idle", "greeting", "observe"}
 
 
 @dataclass(frozen=True)

@@ -31,6 +31,7 @@ class AvatarExpression(StrEnum):
 class AvatarMotion(StrEnum):
     IDLE = "idle"
     GREETING = "greeting"
+    OBSERVE = "observe"
 
 
 @dataclass(frozen=True, slots=True)

@@ -4,6 +4,7 @@ import unittest
 
 from packages.schemas import (
     ActionType,
+    AvatarMotion,
     EmotionLabel,
     EmotionStatus,
     Modality,
@@ -14,6 +15,9 @@ from packages.schemas import (
 
 
 class SchemaTests(unittest.TestCase):
+    def test_observe_is_a_canonical_avatar_motion(self) -> None:
+        self.assertEqual(AvatarMotion.OBSERVE.value, "observe")
+
     def test_turn_record_rejects_inverted_time_range(self) -> None:
         with self.assertRaises(ValueError):
             TurnRecord(

@@ -98,11 +98,20 @@ possible.
 - Expected behavior: one canonical backend worker analyzes ordered three-second
   video-only windows every two seconds. Connected clients poll only metadata and
   receive new `emotion-analysis` and `avatar-state` messages. `wave` immediately
-  drives `Greeting`; repeated greetings are suppressed for five seconds. This path
+  drives `Greeting`; a high-confidence non-still action without an authored Live2D
+  motion drives one neutral `Observe` event.
+  Repeated identical events are edge-triggered and also respect a five-second
+  cooldown. This path
   never invokes chat, ASR, audio emotion, or TTS. The browser “直播” view remains a
   debug preview and is not used as provider input.
+- Frontend fallback: `frontend/avatar-motion-controller.js::playObserveMotion`
+  randomly looks left or right first, crosses to the other side, restores the full
+  parameter/part baseline, and restarts Idle. It preserves the active expression and
+  never interrupts Greeting, CatchButterfly, or HoldBear.
 - Regression tests: `tests/test_emotion_middleware_client.py` validates monotonic
-  sequence parsing; `tests/test_continuous_visual_motion.py` validates cooldown.
+  sequence parsing and the `observe` contract;
+  `tests/test_continuous_visual_motion.py` validates edge/cooldown gating;
+  `tests/test_avatar_motion_controller.js` validates motion, restoration, and Idle.
 
 ### Cached service-context log redaction
 

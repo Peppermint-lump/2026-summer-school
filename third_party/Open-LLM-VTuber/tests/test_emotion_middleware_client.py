@@ -40,6 +40,15 @@ class EmotionMiddlewareClientTests(unittest.TestCase):
         self.assertEqual(parsed.expression, "heart")
         self.assertEqual(parsed.motion, "greeting")
 
+        observe = _parse_result(
+            {
+                "turn_id": "turn_2",
+                "companion_context": "visible action, semantics uncertain",
+                "avatar_state": {"expression": "neutral", "motion": "observe"},
+            }
+        )
+        self.assertEqual(observe.motion, "observe")
+
         with self.assertRaises(ValueError):
             _parse_result(
                 {

@@ -18,6 +18,18 @@ from packages.schemas import (
     ModalityExpression,
 )
 
+_OBSERVE_FALLBACK_ACTIONS = frozenset(
+    {
+        ActionType.THUMBS_UP,
+        ActionType.CLAP,
+        ActionType.NOD,
+        ActionType.HEAD_SHAKE,
+        ActionType.HANDS_UP,
+        ActionType.POINT,
+        ActionType.OTHER,
+    }
+)
+
 
 class AvatarStateMapper:
     def __init__(self, fusion_config: FusionConfig | None = None) -> None:
@@ -28,11 +40,7 @@ class AvatarStateMapper:
             self._suggestion(observation) for observation in analysis.observations
         )
         emotion, expression = self._final_expression(analysis)
-        motion = (
-            AvatarMotion.GREETING
-            if _has_reliable_wave(analysis.observations)
-            else AvatarMotion.IDLE
-        )
+        motion = _motion_for_observations(analysis.observations)
         return AvatarState(
             emotion=emotion,
             expression=expression,
@@ -102,12 +110,27 @@ def _explicit_strong_crying(observation: ModalityEmotion) -> bool:
     return any(cue in evidence for cue in ("crying", "tears", "哭泣", "流泪"))
 
 
-def _has_reliable_wave(observations: tuple[ModalityEmotion, ...]) -> bool:
+def _motion_for_observations(
+    observations: tuple[ModalityEmotion, ...],
+) -> AvatarMotion:
+    if _has_reliable_action(observations, ActionType.WAVE):
+        return AvatarMotion.GREETING
+    if any(
+        _has_reliable_action(observations, action_type)
+        for action_type in _OBSERVE_FALLBACK_ACTIONS
+    ):
+        return AvatarMotion.OBSERVE
+    return AvatarMotion.IDLE
+
+
+def _has_reliable_action(
+    observations: tuple[ModalityEmotion, ...], action_type: ActionType
+) -> bool:
     for observation in observations:
         if observation.modality is not Modality.VIDEO:
             continue
         if any(
-            action.action is ActionType.WAVE and action.confidence >= 0.60
+            action.action is action_type and action.confidence >= 0.60
             for action in observation.observed_actions
         ):
             return True

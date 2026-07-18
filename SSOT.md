@@ -206,6 +206,13 @@ Xiaohudie special motions must remain visible for their complete presentation wi
 
 Natural completion must transition back to the captured standing baseline over 500 ms before restarting `Idle`. A newer special-motion request may interrupt this transition and replace the previous motion immediately.
 
+The canonical `observe` motion is a bounded, model-local fallback for a
+high-confidence non-still visible action without an authored motion, including
+`other`. For Xiaohudie it performs a
+short left/right look by changing `ParamAngleY` and `ParamBodyAngleY`, restores the
+captured baseline, and restarts `Idle`. It is not an inferred semantic action, must
+not generate speech, and must not interrupt an authored special motion.
+
 The local scene background automatically follows local time:
 
 - `06:00` through `16:59`: daytime MP4 background;
@@ -553,12 +560,15 @@ The Windows MVP is accepted when:
 8. text, audio, and video emotion providers return canonical schemas;
 9. ordered video frames can report a standardized action such as `wave` without
    creating a fourth modality;
-10. low-quality video does not cause strong conflict;
-11. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
-12. provider failure degrades to ordinary conversation;
-13. temporary media is removed by default;
-14. secrets are not present in the repository or renderer;
-15. the app exits without leaving backend processes running.
+10. a high-confidence non-still action without an authored motion can produce one
+    neutral `observe` fallback
+    without inventing action semantics or triggering speech;
+11. low-quality video does not cause strong conflict;
+12. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
+13. provider failure degrades to ordinary conversation;
+14. temporary media is removed by default;
+15. secrets are not present in the repository or renderer;
+16. the app exits without leaving backend processes running.
 
 ---
 

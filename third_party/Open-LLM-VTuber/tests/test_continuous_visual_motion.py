@@ -7,28 +7,73 @@ from src.open_llm_vtuber.websocket_handler import _cooldown_motion
 
 class ContinuousVisualMotionTests(unittest.TestCase):
     def test_repeated_greeting_is_suppressed_during_cooldown(self) -> None:
-        motion, last = _cooldown_motion(
-            "greeting", now=10.0, last_greeting_at=float("-inf"), cooldown_seconds=5
+        motion, previous, emitted = _cooldown_motion(
+            "greeting",
+            now=10.0,
+            previous_event_motion=None,
+            last_emitted_at={},
+            cooldown_seconds=5,
         )
-        self.assertEqual((motion, last), ("greeting", 10.0))
-
-        motion, last = _cooldown_motion(
-            "greeting", now=12.0, last_greeting_at=last, cooldown_seconds=5
-        )
-        self.assertEqual((motion, last), ("idle", 10.0))
-
-        motion, last = _cooldown_motion(
-            "greeting", now=15.0, last_greeting_at=last, cooldown_seconds=5
-        )
-        self.assertEqual((motion, last), ("greeting", 15.0))
-
-    def test_non_greeting_motion_is_unchanged(self) -> None:
         self.assertEqual(
-            _cooldown_motion(
-                "idle", now=2.0, last_greeting_at=1.0, cooldown_seconds=5
-            ),
-            ("idle", 1.0),
+            (motion, previous, emitted), ("greeting", "greeting", {"greeting": 10.0})
         )
+
+        motion, previous, emitted = _cooldown_motion(
+            "greeting",
+            now=12.0,
+            previous_event_motion=previous,
+            last_emitted_at=emitted,
+            cooldown_seconds=5,
+        )
+        self.assertEqual((motion, previous), ("idle", "greeting"))
+
+        motion, previous, emitted = _cooldown_motion(
+            "idle",
+            now=13.0,
+            previous_event_motion=previous,
+            last_emitted_at=emitted,
+            cooldown_seconds=5,
+        )
+        self.assertEqual((motion, previous), ("idle", None))
+
+        motion, previous, emitted = _cooldown_motion(
+            "greeting",
+            now=15.0,
+            previous_event_motion=previous,
+            last_emitted_at=emitted,
+            cooldown_seconds=5,
+        )
+        self.assertEqual(
+            (motion, previous, emitted), ("greeting", "greeting", {"greeting": 15.0})
+        )
+
+    def test_observe_is_edge_triggered_and_does_not_block_greeting(self) -> None:
+        motion, previous, emitted = _cooldown_motion(
+            "observe",
+            now=2.0,
+            previous_event_motion=None,
+            last_emitted_at={},
+            cooldown_seconds=5,
+        )
+        self.assertEqual((motion, previous), ("observe", "observe"))
+
+        motion, previous, emitted = _cooldown_motion(
+            "observe",
+            now=8.0,
+            previous_event_motion=previous,
+            last_emitted_at=emitted,
+            cooldown_seconds=5,
+        )
+        self.assertEqual((motion, previous), ("idle", "observe"))
+
+        motion, previous, emitted = _cooldown_motion(
+            "greeting",
+            now=8.1,
+            previous_event_motion=previous,
+            last_emitted_at=emitted,
+            cooldown_seconds=5,
+        )
+        self.assertEqual((motion, previous), ("greeting", "greeting"))
 
 
 if __name__ == "__main__":
