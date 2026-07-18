@@ -143,23 +143,27 @@ Any direct modification must include:
 
 ### 2.8 Purchased Live2D assets
 
-Purchased Live2D files are private assets.
+Purchased Live2D files are licensed assets. On 2026-07-18, the project owner
+explicitly confirmed that the Xiaohudie and Felix runtime assets may be tracked
+and used in this repository for development and testing. This is a
+repository-scoped exception; it does not authorize redistribution through
+other repositories or standalone asset packages.
 
 Forbidden:
 
-- committing original or modified model files to a public repository;
-- renaming or redistributing licensed assets without checking the license;
+- redistributing licensed assets outside this approved repository without checking the license;
 - modifying the original backup copy;
-- bundling assets into public releases unless the license permits it.
+- bundling raw assets into standalone public releases unless the license permits it.
 
-Development must use:
+Local development backups must use:
 
 ```text
 assets/live2d/xiaohudie-original/  # immutable local backup
 assets/live2d/xiaohudie-runtime/   # local working copy
 ```
 
-Both directories must be ignored by Git unless the project owner explicitly states otherwise.
+Both backup directories remain ignored by Git. Authorized runtime copies may be
+tracked only under `third_party/Open-LLM-VTuber/live2d-models/`.
 
 ---
 

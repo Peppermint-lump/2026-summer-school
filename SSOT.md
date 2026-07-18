@@ -200,7 +200,11 @@ The local scene background automatically follows local time:
 - `17:00` through `05:59`: nighttime MP4 background;
 - video backgrounds loop silently and use cover scaling without changing aspect ratio.
 
-The original purchased model files are immutable local backup assets.
+The original purchased model files are immutable local backup assets. The
+project owner has confirmed that the Xiaohudie and Felix runtime copies may be
+tracked in this repository for development and testing; this exception does not
+authorize redistribution through other repositories or standalone asset
+packages.
 
 ---
 
@@ -563,6 +567,6 @@ Provider-generated confidence must not be reported as calibrated accuracy.
 - automatic cloud account provisioning;
 - autonomous emergency escalation;
 - arbitrary Live2D motion generation;
-- public redistribution of purchased avatar assets.
+- redistribution of purchased avatar assets outside the owner-approved repository and runtime use.
 
 These may be considered only after the MVP is accepted.
