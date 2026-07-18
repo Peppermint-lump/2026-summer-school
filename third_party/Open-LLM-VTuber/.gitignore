@@ -9,6 +9,8 @@ conf.yaml
 /live2d-models/*
 !/live2d-models/mao_pro
 !/live2d-models/shizuku
+!/live2d-models/xiaohudie
+!/live2d-models/felix
 
 # ignore non-default character configs
 /characters/*
