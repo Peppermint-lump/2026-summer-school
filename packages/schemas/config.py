@@ -41,6 +41,8 @@ class VideoAnalysisConfig:
     prompt_path: Path = Path("configs/prompts/video_emotion_v1.txt")
     prompt_version: str = "video_emotion_v1"
     minimum_quality: float = 0.45
+    action_minimum_confidence: float = 0.60
+    action_emotion_weight: float = 0.25
 
     def __post_init__(self) -> None:
         if self.provider != "mimo":
@@ -49,11 +51,61 @@ class VideoAnalysisConfig:
             raise ValueError("invalid video provider timeout or retry configuration")
         if not 0.0 <= self.minimum_quality <= 1.0:
             raise ValueError("minimum_quality must be between 0 and 1")
+        if not 0.0 <= self.action_minimum_confidence <= 1.0:
+            raise ValueError("action_minimum_confidence must be between 0 and 1")
+        if not 0.0 <= self.action_emotion_weight <= 0.5:
+            raise ValueError("action_emotion_weight must be between 0 and 0.5")
         if not self.prompt_version or not self.api_key_secret_name:
             raise ValueError("prompt version and secret name must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class TextAnalysisConfig:
+    enabled: bool = False
+    provider: str = "glm"
+    model: str = "glm-4.7-flash"
+    base_url: str = "https://open.bigmodel.cn/api/paas/v4"
+    api_key_secret_name: str = "GLM_API_KEY"
+    timeout_seconds: float = 12.0
+    max_retries: int = 2
+    prompt_path: Path = Path("configs/prompts/text_emotion_v1.txt")
+    prompt_version: str = "text_emotion_v1"
+
+    def __post_init__(self) -> None:
+        if self.provider != "glm":
+            raise ValueError("only the configured MVP text provider 'glm' is supported")
+        if self.timeout_seconds <= 0 or self.max_retries < 0:
+            raise ValueError("invalid text provider timeout or retry configuration")
+        if not self.prompt_version or not self.api_key_secret_name:
+            raise ValueError("prompt version and secret name must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class FusionConfig:
+    reliable_threshold: float = 0.55
+    positive_threshold: float = 0.25
+    negative_threshold: float = -0.25
+    text_weight: float = 0.45
+    audio_weight: float = 0.25
+    video_weight: float = 0.30
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.reliable_threshold <= 1.0:
+            raise ValueError("fusion reliable_threshold must be between 0 and 1")
+        if not 0.0 < self.positive_threshold <= 1.0:
+            raise ValueError("fusion positive_threshold must be in (0, 1]")
+        if not -1.0 <= self.negative_threshold < 0.0:
+            raise ValueError("fusion negative_threshold must be in [-1, 0)")
+        if self.negative_threshold >= self.positive_threshold:
+            raise ValueError("fusion label thresholds overlap")
+        weights = (self.text_weight, self.audio_weight, self.video_weight)
+        if any(weight <= 0.0 for weight in weights):
+            raise ValueError("fusion modality weights must be positive")
 
 
 @dataclass(frozen=True, slots=True)
 class AppConfig:
     camera: CameraCaptureConfig = CameraCaptureConfig()
     video_emotion: VideoAnalysisConfig = VideoAnalysisConfig()
+    text_emotion: TextAnalysisConfig = TextAnalysisConfig()
+    fusion: FusionConfig = FusionConfig()

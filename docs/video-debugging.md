@@ -43,8 +43,9 @@ macOS 首次运行时需要在系统摄像头权限窗口中明确允许当前�
 打开后可以看到实时画面、视频管线收帧状态、人脸帧数、多人帧、质量和降级原因。
 点击页面中的“停止摄像头和服务器”可以安全退出。
 
-该页面只验证当前已实现的摄像头和人脸质量链路；在手势模块完成前会明确显示
-“动作识别：尚未实现”，不会伪造挥手等动作结果。
+该页面只验证摄像头和人脸质量链路，不调用付费 Provider，因此实时状态显示
+“按轮次 Provider 分析”。按 turn 的动作识别由 MiMo 有序多帧分析实现，结果在
+下方 Provider smoke test 完成后输出；实时本地动作叠加层仍是后续工作。
 
 ## 4. MiMo provider smoke test
 
@@ -53,6 +54,7 @@ macOS 首次运行时需要在系统摄像头权限窗口中明确允许当前�
 
 ```dotenv
 VIDEO_EMOTION_ENABLED=true
+TEXT_EMOTION_ENABLED=true
 ```
 
 模型、端点和开关会从 `.env` 覆盖本地 YAML。然后运行：
@@ -60,6 +62,17 @@ VIDEO_EMOTION_ENABLED=true
 ```bash
 .venv/bin/python scripts/debug_video_pipeline.py --mode provider --duration 5
 ```
+
+在五秒内挥手，并提供本轮 ASR 文本，可同时查看标准化动作、文本情绪和最终融合：
+
+```bash
+.venv/bin/python scripts/debug_video_pipeline.py --mode provider --duration 5 \
+  --transcript "我今天感觉很好"
+```
+
+输出中的 `observed_actions` 是视频模态内部证据。动作最多占视频结果的 25%，随后
+视频结果才与文本结果按 `modality_weight × reliability` 加权；动作不会作为第四个
+模态被重复计算。
 
 不要把密钥写入 YAML、命令历史、日志或 Git。Provider 模式默认在推理结束、
 失败或超时后删除当前 turn 的采样帧。
@@ -73,9 +86,9 @@ VIDEO_EMOTION_ENABLED=true
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-## 6. 待评估：MiMo 动作视频输入
+## 6. 待评估：MiMo 原生短视频输入
 
 当前默认摄像头画面为 `640x480`，帧导出的最长边上限为 768，因此默认配置下
 不会把画面缩小成低分辨率截图。现有 Provider 发送的是按 2 FPS 采样、最多 12 张
-的 JPEG 序列；后续评估挥手等时序动作时，应比较该方案与 MiMo 静音短视频输入，
-不能把成本或识别效果建立在“当前截图分辨率很低”的假设上。
+的 JPEG 序列，已经可以返回标准化动作；后续仍应比较该方案与 MiMo 静音短视频
+输入的准确率、延迟和费用，不能把效果建立在“当前截图分辨率很低”的假设上。

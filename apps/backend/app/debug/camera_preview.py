@@ -50,7 +50,7 @@ class CameraPreviewApplication:
             "mean_brightness": report.mean_brightness,
             "mean_sharpness": report.mean_sharpness,
             "reasons": report.reasons,
-            "gesture_recognition": "not_implemented",
+            "gesture_recognition": "provider_turn_level",
             "observed_action": None,
             "retained_media": False,
         }
@@ -223,8 +223,8 @@ def _preview_html(token: str) -> str:
     <div class="status"><span>多人帧</span><span id="multiple" class="value">0</span></div>
     <div class="status"><span>画面质量</span><span id="quality" class="value">0</span></div>
     <div class="status"><span>质量原因</span><span id="reasons" class="value">—</span></div>
-    <div class="status"><span>动作识别</span><strong class="warn">尚未实现</strong></div>
-    <div class="status"><span>模型观察动作</span><span class="value">—</span></div>
+    <div class="status"><span>动作识别</span><strong class="warn">按轮次 Provider 分析</strong></div>
+    <div class="status"><span>当前预览动作</span><span class="value">不在本地实时推理</span></div>
     <button id="stop">停止摄像头和服务器</button>
   </aside></div>
   <script>

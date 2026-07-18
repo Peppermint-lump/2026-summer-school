@@ -14,7 +14,7 @@ from apps.backend.app.emotion.providers.mimo import (
     MiMoVideoEmotionProvider,
 )
 from apps.backend.app.infrastructure.http_client import HttpResponse
-from packages.schemas import EmotionLabel, EmotionStatus
+from packages.schemas import ActionType, EmotionLabel, EmotionStatus
 
 
 class FakeHttpClient:
@@ -100,6 +100,34 @@ class MiMoProviderTests(unittest.IsolatedAsyncioTestCase):
                         prompt_version="video_emotion_v1",
                     )
                 )
+
+    async def test_normalizes_temporal_action_observations(self) -> None:
+        client = FakeHttpClient(
+            [
+                response_with_content(
+                    '{"label":"neutral","confidence":0.7,"evidence":[],'
+                    '"actions":[{"type":"waving","confidence":0.9,'
+                    '"evidence":"hand moves side to side across frames"}]}'
+                )
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            frame = Path(temporary) / "frame.jpg"
+            frame.write_bytes(b"\xff\xd8\xffimage")
+            provider = MiMoVideoEmotionProvider(
+                self.config(), client, prompt="ordered visual frames only"
+            )
+            result = await provider.analyze_video(
+                VideoEmotionRequest(
+                    turn_id="turn_1",
+                    frame_paths=(frame,),
+                    quality=0.9,
+                    prompt_version="video_emotion_v1",
+                )
+            )
+
+        self.assertEqual(result.observed_actions[0].action, ActionType.WAVE)
+        self.assertEqual(result.observed_actions[0].confidence, 0.9)
 
     async def test_rate_limit_retry_is_bounded(self) -> None:
         client = FakeHttpClient(

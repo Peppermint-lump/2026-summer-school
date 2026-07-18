@@ -28,7 +28,7 @@ logs, screenshots, or chat messages.
 | Video-only emotion | `MIMO_MODEL=mimo-v2.5` | `MIMO_API_KEY` | Implemented |
 | Audio-only emotion | `MIMO_MODEL=mimo-v2.5` | `MIMO_API_KEY` | Contract defined; adapter pending |
 | Audio/video fallback | `QWEN_MODEL=qwen3-omni-flash` | `QWEN_API_KEY` | Contract defined; adapter pending |
-| Text-only emotion | `GLM_TEXT_EMOTION_MODEL` | `GLM_API_KEY` | Contract defined; adapter pending |
+| Text-only emotion | `GLM_TEXT_EMOTION_MODEL` | `GLM_API_KEY` | Implemented |
 | Companion response | `GLM_COMPANION_MODEL` | `GLM_API_KEY` | Open-LLM-VTuber connection configured |
 | Speech recognition | `ASR_MODEL=sherpa_onnx_asr` | None | Local |
 | Speech synthesis | `TTS_MODEL=piper_tts` | None | Local voice files still required |
@@ -41,6 +41,9 @@ a workspace URL. GLM uses `https://open.bigmodel.cn/api/paas/v4`.
 The provider/model choices above follow `SSOT.md`. Changing provider bindings is
 a product-contract change, not a local `.env` customization.
 
+The action mapping, reliability threshold, modality weights, and current live
+integration boundary are documented in `docs/action-text-emotion-fusion.md`.
+
 ## Enable and test MiMo video emotion
 
 Keep cloud analysis disabled while editing the file. After filling the MiMo key,
@@ -48,16 +51,25 @@ set:
 
 ```dotenv
 VIDEO_EMOTION_ENABLED=true
+TEXT_EMOTION_ENABLED=true
 ```
 
-Then make one explicit paid smoke-test call:
+Then run one explicit paid smoke-test command:
 
 ```bash
 .venv/bin/python scripts/debug_video_pipeline.py --mode provider --duration 5
 ```
 
-The test samples up to the configured frame limit, makes one provider request,
-and removes temporary media when `retain_media` is false.
+To test action recognition, text emotion, and final weighted fusion together:
+
+```bash
+.venv/bin/python scripts/debug_video_pipeline.py --mode provider --duration 5 \
+  --transcript "我今天感觉很好"
+```
+
+The test samples up to the configured frame limit and removes temporary media
+when `retain_media` is false. Without `--transcript` it makes one MiMo request;
+with `--transcript` it additionally makes one GLM text-emotion request.
 
 ## Validate and start GLM-backed VTuber
 

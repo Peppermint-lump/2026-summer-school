@@ -46,7 +46,7 @@ class CameraPreviewTests(unittest.TestCase):
         status = self.build_application().status()
         self.assertTrue(status["pipeline_receiving_frames"])
         self.assertEqual(status["recent_frame_count"], 1)
-        self.assertEqual(status["gesture_recognition"], "not_implemented")
+        self.assertEqual(status["gesture_recognition"], "provider_turn_level")
         self.assertFalse(status["retained_media"])
 
     def test_preview_jpeg_is_memory_only_and_valid(self) -> None:

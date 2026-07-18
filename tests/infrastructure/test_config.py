@@ -34,6 +34,25 @@ emotion:
     prompt_path: prompt.txt
     prompt_version: video_emotion_v1
     minimum_quality: 0.45
+    action_minimum_confidence: 0.60
+    action_emotion_weight: 0.25
+  text:
+    enabled: false
+    provider: glm
+    model: glm-4.7-flash
+    base_url: https://glm.invalid/v4
+    api_key_secret_name: GLM_API_KEY
+    timeout_seconds: 12
+    max_retries: 2
+    prompt_path: prompt.txt
+    prompt_version: text_emotion_v1
+fusion:
+  reliable_threshold: 0.55
+  positive_threshold: 0.25
+  negative_threshold: -0.25
+  text_weight: 0.45
+  audio_weight: 0.25
+  video_weight: 0.30
 """
 
 
@@ -72,15 +91,20 @@ class ConfigTests(unittest.TestCase):
                 repository_root=root,
                 environment={
                     "VIDEO_EMOTION_ENABLED": "true",
+                    "TEXT_EMOTION_ENABLED": "true",
                     "VIDEO_EMOTION_PROVIDER": "mimo",
                     "MIMO_MODEL": "mimo-test-model",
                     "MIMO_BASE_URL": "https://mimo.example/v1",
+                    "GLM_TEXT_EMOTION_MODEL": "glm-test-model",
+                    "GLM_BASE_URL": "https://glm.example/v4",
                 },
             )
 
             self.assertTrue(config.video_emotion.enabled)
             self.assertEqual(config.video_emotion.model, "mimo-test-model")
             self.assertEqual(config.video_emotion.base_url, "https://mimo.example/v1")
+            self.assertEqual(config.text_emotion.model, "glm-test-model")
+            self.assertTrue(config.text_emotion.enabled)
 
     def test_secret_store_does_not_fabricate_missing_key(self) -> None:
         with self.assertRaises(ConfigError):

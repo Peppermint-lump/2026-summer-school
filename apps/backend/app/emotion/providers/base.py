@@ -39,3 +39,23 @@ class VideoEmotionRequest:
 
 class VideoEmotionProvider(Protocol):
     async def analyze_video(self, request: VideoEmotionRequest) -> ModalityEmotion: ...
+
+
+@dataclass(frozen=True, slots=True)
+class TextEmotionRequest:
+    turn_id: str
+    transcript: str
+    quality: float
+    prompt_version: str
+
+    def __post_init__(self) -> None:
+        if not self.turn_id or not self.transcript.strip():
+            raise ValueError("text emotion requests require a turn and transcript")
+        if not 0.0 <= self.quality <= 1.0:
+            raise ValueError("quality must be between 0 and 1")
+        if not self.prompt_version:
+            raise ValueError("prompt_version must be non-empty")
+
+
+class TextEmotionProvider(Protocol):
+    async def analyze_text(self, request: TextEmotionRequest) -> ModalityEmotion: ...

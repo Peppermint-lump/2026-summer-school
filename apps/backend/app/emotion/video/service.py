@@ -18,12 +18,15 @@ from packages.schemas import (
     VideoTurnArtifact,
 )
 
+from .action_emotion import ActionEmotionConfig, apply_action_emotion
+
 
 @dataclass(frozen=True, slots=True)
 class VideoEmotionServiceConfig:
     enabled: bool = False
     provider_timeout_seconds: float = 20.0
     prompt_version: str = "video_emotion_v1"
+    action_emotion: ActionEmotionConfig = ActionEmotionConfig()
 
     def __post_init__(self) -> None:
         if self.provider_timeout_seconds <= 0:
@@ -61,7 +64,8 @@ class VideoEmotionService:
         )
         try:
             async with asyncio.timeout(self.config.provider_timeout_seconds):
-                return await self._provider.analyze_video(request)
+                observation = await self._provider.analyze_video(request)
+                return apply_action_emotion(observation, self.config.action_emotion)
         except TimeoutError:
             return _fallback_result(EmotionStatus.TIMEOUT, quality=artifact.quality)
         except ProviderError:

@@ -9,7 +9,13 @@ from typing import Any, cast
 
 import yaml
 
-from packages.schemas import AppConfig, CameraCaptureConfig, VideoAnalysisConfig
+from packages.schemas import (
+    AppConfig,
+    CameraCaptureConfig,
+    FusionConfig,
+    TextAnalysisConfig,
+    VideoAnalysisConfig,
+)
 
 
 class ConfigError(ValueError):
@@ -50,13 +56,14 @@ def load_app_config(
     camera = _mapping(capture, "camera")
     emotion = _mapping(root, "emotion")
     video = _mapping(emotion, "video")
-    prompt_path = (repository_root / _string(video, "prompt_path")).resolve()
-    try:
-        prompt_path.relative_to(repository_root.resolve())
-    except ValueError as exc:
-        raise ConfigError("video prompt_path escapes the repository") from exc
-    if not prompt_path.is_file():
-        raise ConfigError("configured video prompt does not exist")
+    text = _mapping(emotion, "text")
+    fusion = _mapping(root, "fusion")
+    video_prompt_path = _resolve_prompt_path(
+        repository_root, _string(video, "prompt_path"), modality="video"
+    )
+    text_prompt_path = _resolve_prompt_path(
+        repository_root, _string(text, "prompt_path"), modality="text"
+    )
 
     try:
         return AppConfig(
@@ -95,9 +102,46 @@ def load_app_config(
                 api_key_secret_name=_string(video, "api_key_secret_name"),
                 timeout_seconds=_number(video, "timeout_seconds"),
                 max_retries=_integer(video, "max_retries"),
-                prompt_path=prompt_path,
+                prompt_path=video_prompt_path,
                 prompt_version=_string(video, "prompt_version"),
                 minimum_quality=_number(video, "minimum_quality"),
+                action_minimum_confidence=_number(video, "action_minimum_confidence"),
+                action_emotion_weight=_number(video, "action_emotion_weight"),
+            ),
+            text_emotion=TextAnalysisConfig(
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "TEXT_EMOTION_ENABLED",
+                    default=_boolean(text, "enabled"),
+                ),
+                provider=_environment_string(
+                    effective_environment,
+                    "TEXT_EMOTION_PROVIDER",
+                    default=_string(text, "provider"),
+                ),
+                model=_environment_string(
+                    effective_environment,
+                    "GLM_TEXT_EMOTION_MODEL",
+                    default=_string(text, "model"),
+                ),
+                base_url=_environment_string(
+                    effective_environment,
+                    "GLM_BASE_URL",
+                    default=_string(text, "base_url"),
+                ),
+                api_key_secret_name=_string(text, "api_key_secret_name"),
+                timeout_seconds=_number(text, "timeout_seconds"),
+                max_retries=_integer(text, "max_retries"),
+                prompt_path=text_prompt_path,
+                prompt_version=_string(text, "prompt_version"),
+            ),
+            fusion=FusionConfig(
+                reliable_threshold=_number(fusion, "reliable_threshold"),
+                positive_threshold=_number(fusion, "positive_threshold"),
+                negative_threshold=_number(fusion, "negative_threshold"),
+                text_weight=_number(fusion, "text_weight"),
+                audio_weight=_number(fusion, "audio_weight"),
+                video_weight=_number(fusion, "video_weight"),
             ),
         )
     except ValueError as exc:
@@ -109,6 +153,19 @@ def _mapping(value: Mapping[str, Any], key: str) -> dict[str, Any]:
     if not isinstance(child, dict):
         raise ConfigError(f"configuration '{key}' must be a mapping")
     return cast(dict[str, Any], child)
+
+
+def _resolve_prompt_path(
+    repository_root: Path, configured_path: str, *, modality: str
+) -> Path:
+    prompt_path = (repository_root / configured_path).resolve()
+    try:
+        prompt_path.relative_to(repository_root.resolve())
+    except ValueError as exc:
+        raise ConfigError(f"{modality} prompt_path escapes the repository") from exc
+    if not prompt_path.is_file():
+        raise ConfigError(f"configured {modality} prompt does not exist")
+    return prompt_path
 
 
 def _string(value: Mapping[str, Any], key: str) -> str:

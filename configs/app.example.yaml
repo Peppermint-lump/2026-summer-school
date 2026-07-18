@@ -22,3 +22,23 @@ emotion:
     prompt_path: configs/prompts/video_emotion_v1.txt
     prompt_version: video_emotion_v1
     minimum_quality: 0.45
+    action_minimum_confidence: 0.60
+    action_emotion_weight: 0.25
+  text:
+    enabled: false
+    provider: glm
+    model: glm-4.7-flash
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    api_key_secret_name: GLM_API_KEY
+    timeout_seconds: 12
+    max_retries: 2
+    prompt_path: configs/prompts/text_emotion_v1.txt
+    prompt_version: text_emotion_v1
+
+fusion:
+  reliable_threshold: 0.55
+  positive_threshold: 0.25
+  negative_threshold: -0.25
+  text_weight: 0.45
+  audio_weight: 0.25
+  video_weight: 0.30

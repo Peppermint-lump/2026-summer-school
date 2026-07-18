@@ -295,7 +295,13 @@ Output:
 - optional fine emotion;
 - confidence;
 - visible evidence;
+- standardized observed actions from the ordered frame sequence;
 - face/video quality.
+
+Observed actions remain part of the video modality. They must not be counted as
+an additional independent modality. A deterministic, bounded mapping may use a
+high-confidence action as weak video-emotion evidence; semantic actions such as
+head shaking must not be treated as proof of a negative internal state.
 
 ---
 
@@ -325,6 +331,18 @@ Canonical reliability:
 ```text
 reliability = confidence × quality
 ```
+
+For the final emotion summary, deterministic fusion computes a normalized
+reliability-weighted sum:
+
+```text
+weighted_score = Σ(label_score × modality_weight × reliability)
+                 / Σ(modality_weight × reliability)
+```
+
+where positive is `+1`, neutral is `0`, and negative is `-1`. Uncertain or
+unreliable observations do not contribute. Fewer than two reliable modalities
+must produce `insufficient_evidence`, not a strong final label.
 
 This is an engineering heuristic, not a calibrated psychological probability.
 
@@ -527,12 +545,14 @@ The Windows MVP is accepted when:
 6. the camera can be enabled and disabled;
 7. one user turn yields aligned audio and video artifacts internally;
 8. text, audio, and video emotion providers return canonical schemas;
-9. low-quality video does not cause strong conflict;
-10. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
-11. provider failure degrades to ordinary conversation;
-12. temporary media is removed by default;
-13. secrets are not present in the repository or renderer;
-14. the app exits without leaving backend processes running.
+9. ordered video frames can report a standardized action such as `wave` without
+   creating a fourth modality;
+10. low-quality video does not cause strong conflict;
+11. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
+12. provider failure degrades to ordinary conversation;
+13. temporary media is removed by default;
+14. secrets are not present in the repository or renderer;
+15. the app exits without leaving backend processes running.
 
 ---
 

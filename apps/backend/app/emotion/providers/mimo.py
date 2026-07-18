@@ -14,7 +14,13 @@ from apps.backend.app.infrastructure.http_client import (
     HttpClientInvalidResponseError,
     HttpResponse,
 )
-from packages.schemas import EmotionLabel, EmotionStatus, ModalityEmotion
+from packages.schemas import (
+    ActionType,
+    EmotionLabel,
+    EmotionStatus,
+    ModalityEmotion,
+    ObservedAction,
+)
 
 from .base import (
     ProviderError,
@@ -206,6 +212,7 @@ def _canonical_video_result(
     ):
         raise ProviderInvalidOutputError("MiMo evidence must be a list of strings")
     evidence = tuple(item[:200] for item in evidence_value[:6])
+    observed_actions = _normalize_actions(parsed.get("actions", []))
     metadata: dict[str, Any] = {
         "provider": "mimo",
         "model": model,
@@ -223,8 +230,57 @@ def _canonical_video_result(
         status=status,
         fine_emotion=fine_emotion,
         evidence=evidence,
+        observed_actions=observed_actions,
         raw_metadata=metadata,
     )
+
+
+def _normalize_actions(value: Any) -> tuple[ObservedAction, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ProviderInvalidOutputError("MiMo actions must be a list")
+    actions: list[ObservedAction] = []
+    aliases = {
+        "wave": ActionType.WAVE,
+        "waving": ActionType.WAVE,
+        "thumbs_up": ActionType.THUMBS_UP,
+        "thumbs-up": ActionType.THUMBS_UP,
+        "clap": ActionType.CLAP,
+        "clapping": ActionType.CLAP,
+        "nod": ActionType.NOD,
+        "nodding": ActionType.NOD,
+        "head_shake": ActionType.HEAD_SHAKE,
+        "head-shake": ActionType.HEAD_SHAKE,
+        "hands_up": ActionType.HANDS_UP,
+        "hands-up": ActionType.HANDS_UP,
+        "point": ActionType.POINT,
+        "pointing": ActionType.POINT,
+        "still": ActionType.STILL,
+        "other": ActionType.OTHER,
+    }
+    for item in value[:6]:
+        if not isinstance(item, dict):
+            raise ProviderInvalidOutputError("MiMo action entries must be objects")
+        raw_type = item.get("type")
+        confidence = item.get("confidence")
+        evidence = item.get("evidence", "")
+        if not isinstance(raw_type, str) or raw_type.strip().lower() not in aliases:
+            raise ProviderInvalidOutputError("MiMo returned an unsupported action")
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+            raise ProviderInvalidOutputError("MiMo action confidence must be numeric")
+        if not 0.0 <= float(confidence) <= 1.0:
+            raise ProviderInvalidOutputError("MiMo action confidence is outside [0, 1]")
+        if not isinstance(evidence, str):
+            raise ProviderInvalidOutputError("MiMo action evidence must be text")
+        actions.append(
+            ObservedAction(
+                action=aliases[raw_type.strip().lower()],
+                confidence=float(confidence),
+                evidence=evidence[:200],
+            )
+        )
+    return tuple(actions)
 
 
 def _normalize_label(value: Any) -> EmotionLabel:

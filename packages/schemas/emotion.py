@@ -32,6 +32,18 @@ class EmotionStatus(StrEnum):
     DISABLED = "disabled"
 
 
+class ActionType(StrEnum):
+    WAVE = "wave"
+    THUMBS_UP = "thumbs_up"
+    CLAP = "clap"
+    NOD = "nod"
+    HEAD_SHAKE = "head_shake"
+    HANDS_UP = "hands_up"
+    POINT = "point"
+    STILL = "still"
+    OTHER = "other"
+
+
 class VideoArtifactStatus(StrEnum):
     OK = "ok"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
@@ -42,6 +54,18 @@ class VideoArtifactStatus(StrEnum):
 def _validate_unit_interval(name: str, value: float) -> None:
     if not 0.0 <= value <= 1.0:
         raise ValueError(f"{name} must be between 0 and 1")
+
+
+@dataclass(frozen=True, slots=True)
+class ObservedAction:
+    action: ActionType
+    confidence: float
+    evidence: str = ""
+
+    def __post_init__(self) -> None:
+        _validate_unit_interval("action confidence", self.confidence)
+        if len(self.evidence) > 200:
+            raise ValueError("action evidence must not exceed 200 characters")
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +123,7 @@ class ModalityEmotion:
     status: EmotionStatus
     fine_emotion: str | None = None
     evidence: tuple[str, ...] = ()
+    observed_actions: tuple[ObservedAction, ...] = ()
     raw_metadata: dict[str, Any] = field(default_factory=dict)
     schema_version: str = SCHEMA_VERSION
 
@@ -116,6 +141,8 @@ class ModalityEmotion:
         forbidden_metadata = {"frames", "base64", "api_key", "authorization"}
         if forbidden_metadata.intersection(self.raw_metadata):
             raise ValueError("raw_metadata contains sensitive media or credentials")
+        if self.modality is not Modality.VIDEO and self.observed_actions:
+            raise ValueError("observed actions belong only to the video modality")
 
     @classmethod
     def video_result(
@@ -127,10 +154,36 @@ class ModalityEmotion:
         status: EmotionStatus,
         fine_emotion: str | None = None,
         evidence: tuple[str, ...] = (),
+        observed_actions: tuple[ObservedAction, ...] = (),
         raw_metadata: dict[str, Any] | None = None,
     ) -> ModalityEmotion:
         return cls(
             modality=Modality.VIDEO,
+            label=label,
+            confidence=confidence,
+            quality=quality,
+            reliability=round(confidence * quality, 10),
+            status=status,
+            fine_emotion=fine_emotion,
+            evidence=evidence,
+            observed_actions=observed_actions,
+            raw_metadata=raw_metadata or {},
+        )
+
+    @classmethod
+    def text_result(
+        cls,
+        *,
+        label: EmotionLabel,
+        confidence: float,
+        quality: float,
+        status: EmotionStatus,
+        fine_emotion: str | None = None,
+        evidence: tuple[str, ...] = (),
+        raw_metadata: dict[str, Any] | None = None,
+    ) -> ModalityEmotion:
+        return cls(
+            modality=Modality.TEXT,
             label=label,
             confidence=confidence,
             quality=quality,

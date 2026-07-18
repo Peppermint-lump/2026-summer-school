@@ -3,9 +3,12 @@ from __future__ import annotations
 import unittest
 
 from packages.schemas import (
+    ActionType,
     EmotionLabel,
     EmotionStatus,
+    Modality,
     ModalityEmotion,
+    ObservedAction,
     TurnRecord,
 )
 
@@ -37,6 +40,18 @@ class SchemaTests(unittest.TestCase):
                 quality=0.5,
                 status=EmotionStatus.OK,
                 raw_metadata={"base64": "sensitive"},
+            )
+
+    def test_actions_cannot_leak_into_text_modality(self) -> None:
+        with self.assertRaises(ValueError):
+            ModalityEmotion(
+                modality=Modality.TEXT,
+                label=EmotionLabel.POSITIVE,
+                confidence=0.8,
+                quality=0.8,
+                reliability=0.64,
+                status=EmotionStatus.OK,
+                observed_actions=(ObservedAction(ActionType.WAVE, 0.8),),
             )
 
 

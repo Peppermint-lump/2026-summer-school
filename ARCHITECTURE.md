@@ -248,6 +248,7 @@ emotion/
 ├── video/
 │   ├── preprocess.py
 │   ├── face_quality.py
+│   ├── action_emotion.py
 │   └── service.py
 └── text/
     ├── quality.py
@@ -259,6 +260,8 @@ Rules:
 - provider implementations do not know fusion logic;
 - audio service does not receive transcript;
 - video service does not receive transcript or audio labels;
+- standardized actions remain nested video observations and are blended only
+  inside the video service with a bounded deterministic weight;
 - text service receives transcript only;
 - all provider payloads are normalized before leaving `emotion`.
 
@@ -271,6 +274,10 @@ Owns:
 - conflict classification;
 - conflict score;
 - insufficient-evidence rules.
+
+The final label score is a normalized weighted sum of canonical label score,
+configured modality weight, and reliability. The fusion layer never treats an
+observed action as an independent modality.
 
 Structure:
 

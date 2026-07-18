@@ -11,3 +11,6 @@ __all__ = [
     "VideoQualityReport",
     "VideoTurnPreprocessor",
 ]
+from .action_emotion import ActionEmotionConfig, apply_action_emotion
+
+__all__ = ["ActionEmotionConfig", "apply_action_emotion"]
