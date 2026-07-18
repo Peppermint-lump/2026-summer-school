@@ -14,6 +14,13 @@
 - Expected behavior: Open-LLM-VTuber can resolve `live2d_model_name: xiaohudie` to `/live2d-models/xiaohudie/runtime/xiaohudie.model3.json`.
 - Validation: `xiaohudie.model3.json` parses successfully, all referenced runtime files exist, and `conf.yaml` validates with `live2d_model_name: xiaohudie`.
 
+### Nested runtime model discovery
+
+- Reason: upstream `/live2d-models/info` assumed the flat path `<name>/<name>.model3.json`; the approved Xiaohudie and Felix assets use registered nested runtime paths, and Felix's model file is named `wd66.model3.json`.
+- Upstream files: `src/open_llm_vtuber/routes.py`; `src/open_llm_vtuber/live2d_discovery.py`.
+- Expected behavior: the model list resolves each local `model_dict.json` URL, rejects paths escaping `live2d-models/`, and retains compatibility with the original flat layout.
+- Regression test: `tests/test_live2d_model_discovery.py` covers Xiaohudie, Felix, legacy flat models, and path traversal rejection.
+
 ### Xiaohudie runtime asset adaptation
 
 - Reason: VTube Studio expressions and hotkey motions were toggle-style and could remain active or overlap in Open-LLM-VTuber.
