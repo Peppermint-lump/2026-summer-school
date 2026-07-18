@@ -1,0 +1,52 @@
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+
+# Python and tooling
+__pycache__/
+*.py[cod]
+.tools/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Runtime outputs
+runtime/
+logs/
+*.log
+tmp/
+
+# Open-LLM-VTuber local runtime/configuration
+third_party/Open-LLM-VTuber/conf.yaml
+third_party/Open-LLM-VTuber/conf.yaml.backup
+third_party/Open-LLM-VTuber/models/
+third_party/Open-LLM-VTuber/cache/
+third_party/Open-LLM-VTuber/logs/
+third_party/Open-LLM-VTuber/tmp/
+third_party/Open-LLM-VTuber/private/
+third_party/Open-LLM-VTuber/chat_history/
+third_party/Open-LLM-VTuber/knowledge_base/
+third_party/Open-LLM-VTuber/memory.db*
+third_party/Open-LLM-VTuber/zh_CN-huayan-medium.onnx
+third_party/Open-LLM-VTuber/zh_CN-huayan-medium.onnx.json
+
+# Purchased/private Live2D assets
+assets/live2d/xiaohudie-original/
+assets/live2d/xiaohudie-runtime/
+【VTS用】2.0小蝴蝶运行文件/
+
+# Purchased/private scene backgrounds
+背景/
+WebM_前景_适配新版本SHOOST/
+third_party/Open-LLM-VTuber/backgrounds/xiaohudie-day.mp4
+third_party/Open-LLM-VTuber/backgrounds/xiaohudie-night.mp4
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+tests/

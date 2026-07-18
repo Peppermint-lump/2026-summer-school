@@ -1,0 +1,58 @@
+[
+    {
+        "name": "mao_pro",
+        "description": "",
+        "url": "/live2d-models/mao_pro/runtime/mao_pro.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0,
+            "anger": 2,
+            "disgust": 2,
+            "fear": 1,
+            "joy": 3,
+            "smirk": 3,
+            "sadness": 1,
+            "surprise": 3
+        },
+        "tapMotions": {
+            "HitAreaHead": {
+                "": 1
+            },
+            "HitAreaBody": {
+                "": 1
+            }
+        }
+    },
+    {
+        "name": "xiaohudie",
+        "description": "2.0 xiaohudie Live2D runtime copy",
+        "url": "/live2d-models/xiaohudie/runtime/xiaohudie.model3.json",
+        "kScale": 0.75,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0,
+            "butterfly": 1,
+            "blush": 2,
+            "star": 4,
+            "heart": 5,
+            "cry": 6,
+            "sleepy": 7
+        },
+        "tapMotions": {
+            "HitAreaHead": {
+                "Greeting": 1,
+                "CatchButterfly": 1
+            },
+            "HitAreaBody": {
+                "HoldBear": 1
+            }
+        }
+    }
+]
