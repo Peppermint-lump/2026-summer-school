@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from apps.backend.app.emotion.providers.base import (
     ProviderError,
+    ProviderInvalidOutputError,
+    ProviderRateLimitError,
     VideoEmotionProvider,
     VideoEmotionRequest,
 )
@@ -67,11 +69,28 @@ class VideoEmotionService:
                 observation = await self._provider.analyze_video(request)
                 return apply_action_emotion(observation, self.config.action_emotion)
         except TimeoutError:
-            return _fallback_result(EmotionStatus.TIMEOUT, quality=artifact.quality)
+            return _fallback_result(
+                EmotionStatus.TIMEOUT,
+                quality=artifact.quality,
+                evidence=("provider_timeout",),
+            )
+        except ProviderRateLimitError:
+            return _fallback_result(
+                EmotionStatus.PROVIDER_ERROR,
+                quality=artifact.quality,
+                evidence=("provider_rate_limited",),
+            )
+        except ProviderInvalidOutputError:
+            return _fallback_result(
+                EmotionStatus.PROVIDER_ERROR,
+                quality=artifact.quality,
+                evidence=("provider_invalid_output",),
+            )
         except ProviderError:
             return _fallback_result(
                 EmotionStatus.PROVIDER_ERROR,
                 quality=artifact.quality,
+                evidence=("provider_request_failed",),
             )
 
 

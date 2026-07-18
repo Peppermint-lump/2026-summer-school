@@ -33,7 +33,7 @@ macOS 首次运行时需要在系统摄像头权限窗口中明确允许当前�
 脚本只输出帧数、亮度、清晰度、人脸有效比例和质量原因；摄像头会在
 `finally` 中关闭，camera 模式不会将帧写入磁盘。
 
-## 3. 实时调试屏幕
+## 3. 完整链路调试屏幕
 
 ```bash
 .venv/bin/python scripts/start_camera_preview.py
@@ -41,11 +41,13 @@ macOS 首次运行时需要在系统摄像头权限窗口中明确允许当前�
 
 命令会打印一个带临时访问令牌的 `http://127.0.0.1:8765/` 地址。在浏览器中
 打开后可以看到实时画面、视频管线收帧状态、人脸帧数、多人帧、质量和降级原因。
-点击页面中的“停止摄像头和服务器”可以安全退出。
+配置 Provider 后，勾选云端上传确认并点击“开始云端分析”，页面会依次显示采集、
+预处理、Provider、融合状态，最终展示 `wave` 等动作、视频/文字情绪与加权结果。
+点击“停止摄像头和服务器”可以安全退出。
 
-该页面只验证摄像头和人脸质量链路，不调用付费 Provider，因此实时状态显示
-“按轮次 Provider 分析”。按 turn 的动作识别由 MiMo 有序多帧分析实现，结果在
-下方 Provider smoke test 完成后输出；实时本地动作叠加层仍是后续工作。
+每轮的分步 JSON 默认写入 `runtime/debug/emotion_pipeline/debug_<unix_ms>/`，但
+原始采样帧在 Provider 调用后删除。具体接口与文件字段见
+`docs/emotion-debug-interface.md`。
 
 ## 4. MiMo provider smoke test
 

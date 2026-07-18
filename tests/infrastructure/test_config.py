@@ -93,18 +93,35 @@ class ConfigTests(unittest.TestCase):
                     "VIDEO_EMOTION_ENABLED": "true",
                     "TEXT_EMOTION_ENABLED": "true",
                     "VIDEO_EMOTION_PROVIDER": "mimo",
+                    "VIDEO_EMOTION_TIMEOUT_SECONDS": "45",
                     "MIMO_MODEL": "mimo-test-model",
                     "MIMO_BASE_URL": "https://mimo.example/v1",
                     "GLM_TEXT_EMOTION_MODEL": "glm-test-model",
                     "GLM_BASE_URL": "https://glm.example/v4",
+                    "TEXT_EMOTION_TIMEOUT_SECONDS": "30",
                 },
             )
 
             self.assertTrue(config.video_emotion.enabled)
             self.assertEqual(config.video_emotion.model, "mimo-test-model")
             self.assertEqual(config.video_emotion.base_url, "https://mimo.example/v1")
+            self.assertEqual(config.video_emotion.timeout_seconds, 45)
             self.assertEqual(config.text_emotion.model, "glm-test-model")
+            self.assertEqual(config.text_emotion.timeout_seconds, 30)
             self.assertTrue(config.text_emotion.enabled)
+
+    def test_rejects_invalid_environment_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "prompt.txt").write_text("visual only", encoding="utf-8")
+            path = root / "config.yaml"
+            path.write_text(VALID_CONFIG, encoding="utf-8")
+            with self.assertRaises(ConfigError):
+                load_app_config(
+                    path,
+                    repository_root=root,
+                    environment={"TEXT_EMOTION_TIMEOUT_SECONDS": "zero"},
+                )
 
     def test_secret_store_does_not_fabricate_missing_key(self) -> None:
         with self.assertRaises(ConfigError):

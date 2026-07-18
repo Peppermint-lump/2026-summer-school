@@ -30,6 +30,11 @@ logs, screenshots, or chat messages.
 | Audio/video fallback | `QWEN_MODEL=qwen3-omni-flash` | `QWEN_API_KEY` | Contract defined; adapter pending |
 | Text-only emotion | `GLM_TEXT_EMOTION_MODEL` | `GLM_API_KEY` | Implemented |
 | Companion response | `GLM_COMPANION_MODEL` | `GLM_API_KEY` | Open-LLM-VTuber connection configured |
+
+`TEXT_EMOTION_TIMEOUT_SECONDS` and `VIDEO_EMOTION_TIMEOUT_SECONDS` control the
+independent GLM and MiMo latency budgets. The example uses 30 seconds for remote
+debugging; either timeout still degrades to an uncertain modality observation and
+does not discard the other result.
 | Speech recognition | `ASR_MODEL=sherpa_onnx_asr` | None | Local |
 | Speech synthesis | `TTS_MODEL=piper_tts` | None | Local voice files still required |
 

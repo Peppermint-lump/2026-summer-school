@@ -98,9 +98,12 @@ Implemented and offline-tested:
 - GLM text-only emotion provider and timeout fallback;
 - deterministic fusion and conflict classification;
 - parallel text/video middleware;
-- paid opt-in debug command.
+- paid opt-in debug command;
+- camera preview中的按轮次云端分析、逐阶段状态和 metadata-only 调试目录。
 
 The pinned Open-LLM-VTuber process currently runs in its own Python 3.10 runtime,
 while the canonical backend targets Python 3.11. The live conversation path does
-not yet call this middleware. The next integration task is a loopback backend API
-and a narrow Open-LLM-VTuber adapter at the post-ASR/pre-agent insertion point.
+not yet call this middleware automatically. The debug screen now validates the
+complete camera-to-fusion path with optional manual transcript; automatic ASR turn
+alignment still requires the loopback backend API and a narrow Open-LLM-VTuber
+adapter at the post-ASR/pre-agent insertion point.

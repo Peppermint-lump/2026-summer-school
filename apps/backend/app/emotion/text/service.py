@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from apps.backend.app.emotion.providers.base import (
     ProviderError,
+    ProviderInvalidOutputError,
+    ProviderRateLimitError,
     TextEmotionProvider,
     TextEmotionRequest,
 )
@@ -51,15 +53,41 @@ class TextEmotionService:
             async with asyncio.timeout(self.config.provider_timeout_seconds):
                 return await self._provider.analyze_text(request)
         except TimeoutError:
-            return _fallback_result(EmotionStatus.TIMEOUT, quality=quality)
+            return _fallback_result(
+                EmotionStatus.TIMEOUT,
+                quality=quality,
+                evidence=("provider_timeout",),
+            )
+        except ProviderRateLimitError:
+            return _fallback_result(
+                EmotionStatus.PROVIDER_ERROR,
+                quality=quality,
+                evidence=("provider_rate_limited",),
+            )
+        except ProviderInvalidOutputError:
+            return _fallback_result(
+                EmotionStatus.PROVIDER_ERROR,
+                quality=quality,
+                evidence=("provider_invalid_output",),
+            )
         except ProviderError:
-            return _fallback_result(EmotionStatus.PROVIDER_ERROR, quality=quality)
+            return _fallback_result(
+                EmotionStatus.PROVIDER_ERROR,
+                quality=quality,
+                evidence=("provider_request_failed",),
+            )
 
 
-def _fallback_result(status: EmotionStatus, *, quality: float) -> ModalityEmotion:
+def _fallback_result(
+    status: EmotionStatus,
+    *,
+    quality: float,
+    evidence: tuple[str, ...] = (),
+) -> ModalityEmotion:
     return ModalityEmotion.text_result(
         label=EmotionLabel.UNCERTAIN,
         confidence=0.0,
         quality=quality,
         status=status,
+        evidence=evidence,
     )

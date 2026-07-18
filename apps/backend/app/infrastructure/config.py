@@ -100,7 +100,11 @@ def load_app_config(
                     default=_string(video, "base_url"),
                 ),
                 api_key_secret_name=_string(video, "api_key_secret_name"),
-                timeout_seconds=_number(video, "timeout_seconds"),
+                timeout_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_EMOTION_TIMEOUT_SECONDS",
+                    default=_number(video, "timeout_seconds"),
+                ),
                 max_retries=_integer(video, "max_retries"),
                 prompt_path=video_prompt_path,
                 prompt_version=_string(video, "prompt_version"),
@@ -130,7 +134,11 @@ def load_app_config(
                     default=_string(text, "base_url"),
                 ),
                 api_key_secret_name=_string(text, "api_key_secret_name"),
-                timeout_seconds=_number(text, "timeout_seconds"),
+                timeout_seconds=_environment_number(
+                    effective_environment,
+                    "TEXT_EMOTION_TIMEOUT_SECONDS",
+                    default=_number(text, "timeout_seconds"),
+                ),
                 max_retries=_integer(text, "max_retries"),
                 prompt_path=text_prompt_path,
                 prompt_version=_string(text, "prompt_version"),
@@ -217,3 +225,18 @@ def _environment_boolean(
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ConfigError(f"environment variable '{key}' must be a boolean")
+
+
+def _environment_number(
+    environment: Mapping[str, str], key: str, *, default: float
+) -> float:
+    raw_value = environment.get(key)
+    if raw_value is None:
+        return default
+    try:
+        result = float(raw_value.strip())
+    except ValueError as exc:
+        raise ConfigError(f"environment variable '{key}' must be a number") from exc
+    if result <= 0:
+        raise ConfigError(f"environment variable '{key}' must be positive")
+    return result

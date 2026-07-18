@@ -101,8 +101,9 @@ class VideoEmotionServiceTests(unittest.IsolatedAsyncioTestCase):
                 quality=0.8,
             )
             result = await service.analyze(artifact)
-            self.assertEqual(result.status, EmotionStatus.TIMEOUT)
-            self.assertEqual(result.label, EmotionLabel.UNCERTAIN)
+        self.assertEqual(result.status, EmotionStatus.TIMEOUT)
+        self.assertEqual(result.label, EmotionLabel.UNCERTAIN)
+        self.assertEqual(result.evidence, ("provider_timeout",))
 
 
 if __name__ == "__main__":

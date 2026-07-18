@@ -7,6 +7,7 @@ import unittest
 import urllib.error
 import urllib.request
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -30,8 +31,26 @@ class SingleFaceDetector:
         return ((2, 2, 8, 8),)
 
 
+class FakeAnalyzer:
+    def analyze(
+        self,
+        *,
+        duration_seconds: float,
+        transcript: str | None,
+        progress: Any,
+    ) -> dict[str, Any]:
+        progress("capturing")
+        return {
+            "turn_id": "debug_test",
+            "duration_seconds": duration_seconds,
+            "transcript_provided": transcript is not None,
+        }
+
+
 class CameraPreviewTests(unittest.TestCase):
-    def build_application(self) -> CameraPreviewApplication:
+    def build_application(
+        self, *, analyzer: FakeAnalyzer | None = None
+    ) -> CameraPreviewApplication:
         camera = RunningCameraBuffer()
         timestamp_ms = time.time_ns() // 1_000_000
         grid = np.indices((20, 20)).sum(axis=0) % 2
@@ -40,6 +59,7 @@ class CameraPreviewTests(unittest.TestCase):
         return CameraPreviewApplication(
             camera,
             FaceQualityEvaluator(SingleFaceDetector()),
+            analyzer=analyzer,
         )
 
     def test_status_proves_pipeline_received_recent_frame(self) -> None:
@@ -48,6 +68,24 @@ class CameraPreviewTests(unittest.TestCase):
         self.assertEqual(status["recent_frame_count"], 1)
         self.assertEqual(status["gesture_recognition"], "provider_turn_level")
         self.assertFalse(status["retained_media"])
+
+    def test_analysis_runs_in_background_and_publishes_result(self) -> None:
+        application = self.build_application(analyzer=FakeAnalyzer())
+        self.assertTrue(
+            application.start_analysis(duration_seconds=5, transcript="今天很好")
+        )
+        deadline = time.monotonic() + 2
+        status = application.analysis_status()
+        while status["analysis_state"] != "completed" and time.monotonic() < deadline:
+            time.sleep(0.01)
+            status = application.analysis_status()
+        self.assertEqual(status["analysis_state"], "completed")
+        self.assertEqual(status["analysis_result"]["turn_id"], "debug_test")
+
+    def test_analysis_requires_configured_analyzer(self) -> None:
+        application = self.build_application()
+        with self.assertRaises(RuntimeError):
+            application.start_analysis(duration_seconds=5, transcript=None)
 
     def test_preview_jpeg_is_memory_only_and_valid(self) -> None:
         jpeg = self.build_application().latest_jpeg()
