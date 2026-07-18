@@ -38,7 +38,12 @@ third_party/Open-LLM-VTuber/zh_CN-huayan-medium.onnx.json
 # Purchased/private Live2D assets
 assets/live2d/xiaohudie-original/
 assets/live2d/xiaohudie-runtime/
+Felix/
 【VTS用】2.0小蝴蝶运行文件/
+!third_party/Open-LLM-VTuber/live2d-models/xiaohudie/runtime/
+!third_party/Open-LLM-VTuber/live2d-models/xiaohudie/runtime/**
+!third_party/Open-LLM-VTuber/live2d-models/felix/runtime/
+!third_party/Open-LLM-VTuber/live2d-models/felix/runtime/**
 
 # Purchased/private scene backgrounds
 背景/

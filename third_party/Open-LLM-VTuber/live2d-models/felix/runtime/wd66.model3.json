@@ -1,0 +1,55 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "wd66.moc3",
+    "Textures": [
+      "wd66.8192/texture_00.png"
+    ],
+    "Physics": "wd66.physics3.json",
+    "DisplayInfo": "wd66.cdi3.json",
+    "Expressions": [
+      { "Name": "neutral", "File": "neutral.exp3.json" },
+      { "Name": "coat_off", "File": "1.exp3.json" },
+      { "Name": "guitar", "File": "2.exp3.json" },
+      { "Name": "beanie", "File": "3.exp3.json" },
+      { "Name": "cap", "File": "4.exp3.json" },
+      { "Name": "floppy_ears", "File": "5.exp3.json" },
+      { "Name": "upright_ears", "File": "6.exp3.json" },
+      { "Name": "stage_hair", "File": "7.exp3.json" },
+      { "Name": "drink", "File": "8.exp3.json" },
+      { "Name": "expression9", "File": "9.exp3.json" },
+      { "Name": "cards", "File": "10.exp3.json" },
+      { "Name": "gaming", "File": "11.exp3.json" },
+      { "Name": "microphone", "File": "12.exp3.json" },
+      { "Name": "star", "File": "13.exp3.json" },
+      { "Name": "glasses", "File": "14.exp3.json" },
+      { "Name": "angry_symbol", "File": "15.exp3.json" },
+      { "Name": "headset", "File": "16.exp3.json" },
+      { "Name": "shy", "File": "17.exp3.json" },
+      { "Name": "closed_eyes", "File": "18.exp3.json" },
+      { "Name": "heart", "File": "19.exp3.json" },
+      { "Name": "cry", "File": "20.exp3.json" },
+      { "Name": "pout", "File": "21.exp3.json" },
+      { "Name": "strap", "File": "22.exp3.json" },
+      { "Name": "anger", "File": "【表情预设】生气.exp3.json" },
+      { "Name": "stage", "File": "【动作预设】帅气舞台.exp3.json" }
+    ]
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": [
+        "ParamEyeLOpen",
+        "ParamEyeROpen"
+      ]
+    },
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": [
+        "ParamMouthOpenY"
+      ]
+    }
+  ]
+}

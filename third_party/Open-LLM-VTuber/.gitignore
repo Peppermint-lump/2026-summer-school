@@ -9,10 +9,13 @@ conf.yaml
 /live2d-models/*
 !/live2d-models/mao_pro
 !/live2d-models/shizuku
+!/live2d-models/xiaohudie
+!/live2d-models/felix
 
 # ignore non-default character configs
 /characters/*
 !/characters/README.md
+!/characters/felix.yaml
 # but all of the defaults are already tracked, so no need to un-ignore them
 
 # ignore avatars
@@ -47,6 +50,7 @@ logs/*
 
 # Cache and models
 cache/*
+g2pW/
 src/open_llm_vtuber/tts/asset
 src/open_llm_vtuber/tts/config
 src/open_llm_vtuber/asr/models*

@@ -16,6 +16,12 @@
     "CatchButterfly",
     "HoldBear",
   ]);
+  const SPECIAL_MOTION_DISPLAY_MS = Object.freeze({
+    Greeting: 5000,
+    CatchButterfly: 6000,
+    HoldBear: 3000,
+  });
+  const IDLE_TRANSITION_DURATION_MS = 500;
   const IDLE_GROUP = "Idle";
   const NEUTRAL_EXPRESSION = "neutral";
   const INVALID_MOTION_HANDLE = -1;
@@ -54,6 +60,16 @@
     return entries.length > 0 ? entries[entries.length - 1][0] : null;
   }
 
+  function supportsSpecialMotionLifecycle(model) {
+    const setting = model && model._modelSetting;
+    if (!setting || typeof setting.getMotionCount !== "function") {
+      return false;
+    }
+    return Array.from(SPECIAL_MOTION_GROUPS).every(function (group) {
+      return setting.getMotionCount(group) > 0;
+    });
+  }
+
   class AvatarMotionController {
     constructor() {
       this.model = null;
@@ -86,6 +102,7 @@
         index: active.index,
         queueHandle: active.queueHandle,
         expectedDurationMs: active.expectedDurationMs,
+        minimumDisplayDurationMs: active.minimumDisplayDurationMs,
       };
     }
 
@@ -95,12 +112,12 @@
       }
 
       if (this.model) {
-        this.cancelActiveSpecialMotion({
-          reason: "model switched",
-          resetParameters: false,
-          startIdle: false,
-        });
         if (this.originalStartTapMotion) {
+          this.cancelActiveSpecialMotion({
+            reason: "model switched",
+            resetParameters: false,
+            startIdle: false,
+          });
           this.model.startTapMotion = this.originalStartTapMotion;
         }
       }
@@ -110,6 +127,13 @@
       this.baseline = null;
       this.activeSpecialMotion = null;
       this.transitionTo("idle", "controller attached");
+      this.originalStartTapMotion = null;
+
+      if (!supportsSpecialMotionLifecycle(model)) {
+        debug("controller bypassed for model without Xiaohudie motions", { model });
+        return;
+      }
+
       this.originalStartTapMotion = model.startTapMotion.bind(model);
 
       const controller = this;
@@ -150,17 +174,85 @@
         return;
       }
       const before = this.captureBaseline();
-      this.baseline.parameters.forEach(function (value, index) {
-        core.setParameterValueByIndex(index, value);
-      });
-      this.baseline.parts.forEach(function (value, index) {
-        core.setPartOpacityByIndex(index, value);
-      });
-      core.saveParameters();
+      this.applySnapshot(this.baseline);
       debug("special state restored", {
         reason,
         before,
         after: this.baseline,
+      });
+    }
+
+    applySnapshot(snapshot) {
+      const core = this.model && this.model._model;
+      if (!core || !snapshot) {
+        return;
+      }
+      snapshot.parameters.forEach(function (value, index) {
+        core.setParameterValueByIndex(index, value);
+      });
+      snapshot.parts.forEach(function (value, index) {
+        core.setPartOpacityByIndex(index, value);
+      });
+      core.saveParameters();
+    }
+
+    fadeToBaseline(active, reason) {
+      const from = this.captureBaseline();
+      const target = this.baseline;
+      if (!from || !target) {
+        this.restoreBaseline(reason);
+        return Promise.resolve({ status: "completed" });
+      }
+
+      const startedAt = performance.now();
+      return new Promise((resolve) => {
+        active.resolveTransition = resolve;
+
+        const renderTransitionFrame = () => {
+          if (
+            active.token !== this.motionToken ||
+            this.activeSpecialMotion !== active
+          ) {
+            active.animationFrame = null;
+            active.resolveTransition = null;
+            resolve({ status: "cancelled" });
+            return;
+          }
+
+          const elapsedMs = performance.now() - startedAt;
+          const progress = Math.min(elapsedMs / IDLE_TRANSITION_DURATION_MS, 1);
+          const easedProgress = progress * progress * (3 - 2 * progress);
+          const snapshot = {
+            parameters: target.parameters.map(function (value, index) {
+              return from.parameters[index] +
+                (value - from.parameters[index]) * easedProgress;
+            }),
+            parts: target.parts.map(function (value, index) {
+              return from.parts[index] +
+                (value - from.parts[index]) * easedProgress;
+            }),
+          };
+          this.applySnapshot(snapshot);
+
+          if (progress >= 1) {
+            active.animationFrame = null;
+            active.resolveTransition = null;
+            debug("Idle transition completed", {
+              reason,
+              durationMs: elapsedMs,
+            });
+            resolve({ status: "completed", elapsedMs });
+            return;
+          }
+
+          active.animationFrame = window.requestAnimationFrame(
+            renderTransitionFrame,
+          );
+        };
+
+        active.animationFrame = window.requestAnimationFrame(
+          renderTransitionFrame,
+        );
       });
     }
 
@@ -197,6 +289,13 @@
           reason: options.reason,
         });
         active.resolveCompletion = null;
+      }
+      if (active && active.resolveTransition) {
+        active.resolveTransition({
+          status: "interrupted",
+          reason: options.reason,
+        });
+        active.resolveTransition = null;
       }
 
       this.stopMotionQueue(options.reason);
@@ -253,6 +352,9 @@
       active.queueHandle = queueHandle;
       active.requestTime = requestTime;
       active.expectedDurationMs = this.motionDurationMs(group, index);
+      active.minimumDisplayDurationMs = SPECIAL_MOTION_DISPLAY_MS[group] ||
+        active.expectedDurationMs ||
+        0;
       debug("motion requested", {
         group,
         index,
@@ -261,6 +363,7 @@
         priority: MOTION_PRIORITY.SPECIAL,
         requestTime,
         expectedDurationMs: active.expectedDurationMs,
+        minimumDisplayDurationMs: active.minimumDisplayDurationMs,
         state: this.state,
       });
 
@@ -287,10 +390,31 @@
             });
           }
 
-          if (motionManager.isFinishedByHandle(queueHandle)) {
-            const finishedAt = performance.now();
-            const startedAt = active.startedAt || requestTime;
-            const elapsedMs = finishedAt - startedAt;
+          const queueFinished = motionManager.isFinishedByHandle(queueHandle);
+          const finishedAt = performance.now();
+          const startedAt = active.startedAt || requestTime;
+          const elapsedMs = finishedAt - startedAt;
+          if (queueFinished && elapsedMs < active.minimumDisplayDurationMs) {
+            if (!active.completionHold && active.startedAt) {
+              active.completionHold = this.captureBaseline();
+              debug("motion completed before minimum display duration", {
+                group,
+                index,
+                token,
+                queueHandle,
+                elapsedMs,
+                minimumDisplayDurationMs: active.minimumDisplayDurationMs,
+              });
+            }
+            if (active.completionHold) {
+              this.applySnapshot(active.completionHold);
+            }
+          }
+
+          if (
+            queueFinished &&
+            elapsedMs >= active.minimumDisplayDurationMs
+          ) {
             active.animationFrame = null;
             active.resolveCompletion = null;
             debug("motion naturally finished", {
@@ -301,6 +425,7 @@
               finishedAt,
               elapsedMs,
               expectedDurationMs: active.expectedDurationMs,
+              minimumDisplayDurationMs: active.minimumDisplayDurationMs,
               source: "CubismMotionQueueManager.isFinishedByHandle",
             });
             resolve({ status: "completed", elapsedMs });
@@ -349,10 +474,13 @@
         index: selectedIndex,
         queueHandle: null,
         expectedDurationMs: null,
+        minimumDisplayDurationMs: SPECIAL_MOTION_DISPLAY_MS[group] || 0,
         requestTime: null,
         startedAt: null,
         animationFrame: null,
         resolveCompletion: null,
+        resolveTransition: null,
+        completionHold: null,
       };
       this.transitionTo("special-motion", `starting ${group}_${selectedIndex}`);
 
@@ -366,7 +494,6 @@
       }
 
       const active = this.activeSpecialMotion;
-      this.activeSpecialMotion = null;
       if (result.status !== "completed") {
         this.cancelActiveSpecialMotion({
           reason: `motion ${group}_${selectedIndex} ${result.status}`,
@@ -388,9 +515,21 @@
           queueHandle: active.queueHandle,
         },
       });
-      this.restoreBaseline("natural motion completion");
+      this.stopMotionQueue("begin smooth Idle transition");
+      const transitionResult = await this.fadeToBaseline(
+        active,
+        "natural motion completion",
+      );
+      if (
+        transitionResult.status !== "completed" ||
+        token !== this.motionToken ||
+        this.activeSpecialMotion !== active
+      ) {
+        return;
+      }
+
+      this.activeSpecialMotion = null;
       this.model.setExpression(NEUTRAL_EXPRESSION);
-      this.stopMotionQueue("replace automatic Idle after completion");
       this.model.startRandomMotion(IDLE_GROUP, MOTION_PRIORITY.IDLE);
       this.baseline = null;
       this.transitionTo("idle", "natural motion completion");
@@ -398,12 +537,12 @@
     }
 
     destroy(reason) {
-      this.cancelActiveSpecialMotion({
-        reason,
-        resetParameters: false,
-        startIdle: false,
-      });
       if (this.model && this.originalStartTapMotion) {
+        this.cancelActiveSpecialMotion({
+          reason,
+          resetParameters: false,
+          startIdle: false,
+        });
         this.model.startTapMotion = this.originalStartTapMotion;
       }
       this.model = null;

@@ -14,7 +14,6 @@ $templatePath = Join-Path $upstreamDir "config_templates\conf.default.yaml"
 $localUv = Join-Path $repoRoot ".tools\uv\bin\uv.exe"
 $uvCacheDir = Join-Path $repoRoot ".tools\uv-cache"
 $uvToolDir = Join-Path $repoRoot ".tools\uv-tools"
-$pythonCommand = Get-Command python -ErrorAction SilentlyContinue
 $venvPython = Join-Path $upstreamDir ".venv\Scripts\python.exe"
 
 if (-not (Test-Path -LiteralPath $upstreamDir)) {
@@ -32,6 +31,12 @@ else {
     throw "uv is not available on PATH or at $localUv. Install uv before running the Open-LLM-VTuber dev server."
 }
 
+$listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+if ($listener) {
+    $processIds = ($listener | Select-Object -ExpandProperty OwningProcess -Unique) -join ", "
+    throw "Port $Port is already in use by process $processIds. Stop the existing Open-LLM-VTuber server before starting another one."
+}
+
 if (-not (Test-Path -LiteralPath $configPath)) {
     Copy-Item -LiteralPath $templatePath -Destination $configPath
 }
@@ -47,12 +52,12 @@ Push-Location $upstreamDir
 try {
     $env:UV_CACHE_DIR = $uvCacheDir
     $env:UV_TOOL_DIR = $uvToolDir
-    if ($pythonCommand) {
-        $env:UV_PYTHON = $pythonCommand.Source
-    }
 
     if (-not $SkipSync) {
         & $uv sync
+        if ($LASTEXITCODE -ne 0) {
+            throw "uv sync failed with exit code $LASTEXITCODE. The server was not started."
+        }
     }
 
     if (-not (Test-Path -LiteralPath $venvPython)) {
@@ -60,6 +65,9 @@ try {
     }
 
     & $venvPython run_server.py
+    if ($LASTEXITCODE -ne 0) {
+        throw "Open-LLM-VTuber exited with code $LASTEXITCODE."
+    }
 }
 finally {
     Pop-Location

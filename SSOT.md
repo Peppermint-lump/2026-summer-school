@@ -138,7 +138,8 @@ The MVP is not considered blocked by incomplete macOS packaging if the Windows d
 
 - Electron desktop shell.
 - Open-LLM-VTuber v1.2.1 as the digital-human foundation.
-- Live2D “小蝴蝶” model as the avatar asset.
+- Live2D “小蝴蝶” model as the default avatar asset.
+- Live2D “Felix / 菲力克斯” model as a selectable second avatar with an isolated character persona.
 - Local loopback backend service.
 - Python 3.11 backend.
 - `uv` for Python dependency management.
@@ -194,6 +195,14 @@ The runtime copy of the “小蝴蝶” model must include:
 
 The Idle motion is required because it drives the crying and sleepy loop parameters.
 
+Xiaohudie special motions must remain visible for their complete presentation window:
+
+- `Greeting`: 5 seconds;
+- `CatchButterfly`: 6 seconds;
+- `HoldBear`: 3 seconds.
+
+Natural completion must transition back to the captured standing baseline over 500 ms before restarting `Idle`. A newer special-motion request may interrupt this transition and replace the previous motion immediately.
+
 The local scene background automatically follows local time:
 
 - `06:00` through `16:59`: daytime MP4 background;
@@ -205,6 +214,16 @@ project owner has confirmed that the Xiaohudie and Felix runtime copies may be
 tracked in this repository for development and testing; this exception does not
 authorize redistribution through other repositories or standalone asset
 packages.
+
+The selectable Felix runtime must include:
+
+- all 22 supplied expression presets registered in `model3.json`;
+- `ParamMouthOpenY` in the `LipSync` parameter group;
+- an isolated `felix_001` character configuration and persona;
+- the local `zh_CN-chaowen-medium` Piper voice, isolated from Xiaohudie's `zh_CN-huayan-medium` voice;
+- no automatic use of outfit, prop, or pose presets as conversational emotions.
+
+Switching to Felix changes the Live2D model, persona, and TTS voice together. Switching back restores the Xiaohudie model, persona, and voice. Xiaohudie remains the startup default.
 
 ---
 
