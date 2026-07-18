@@ -14,6 +14,7 @@ from .single_conversation import process_single_conversation
 from .conversation_utils import EMOJI_LIST
 from .types import GroupConversationState
 from prompts import prompt_loader
+from ..companion_input_safety import discard_raw_companion_images
 
 
 async def handle_conversation_trigger(
@@ -68,7 +69,16 @@ async def handle_conversation_trigger(
         user_input = received_data_buffers[client_uid]
         received_data_buffers[client_uid] = np.array([])
 
-    images = data.get("images")
+    images, metadata, discarded_image_count = discard_raw_companion_images(
+        data.get("images"), metadata
+    )
+    if discarded_image_count:
+        logger.warning(
+            "Discarded {} raw camera image(s) at the companion boundary; "
+            "the canonical visual-emotion pipeline remains independent".format(
+                discarded_image_count
+            )
+        )
     session_emoji = np.random.choice(EMOJI_LIST)
 
     group = chat_group_manager.get_client_group(client_uid)

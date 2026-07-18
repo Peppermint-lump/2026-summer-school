@@ -46,9 +46,36 @@
 - Resource adaptation: `scripts/prepare_xiaohudie_one_shot_motions.py` changes only `Meta.Loop` to `false` for Greeting, CatchButterfly, and HoldBear. Their authored curves and durations remain unchanged; parameter restoration belongs to the frontend lifecycle controller.
 - Validation: `xiaohudie.model3.json` parses successfully, all referenced runtime files exist, expressions cover the expected toggle parameters, and non-idle motions have `Loop: false`.
 
-Apart from the narrowly scoped silent-TTS patch documented below, no other upstream Python source patches have been applied.
+Apart from the narrowly scoped patches documented below, project-specific behavior
+should be added through adapters under `apps/backend/app/integration/` whenever
+possible.
 
-Project-specific behavior should be added through adapters under `apps/backend/app/integration/` unless a narrow upstream patch is unavoidable.
+### Companion raw-image boundary
+
+- Reason: the bundled frontend attaches camera snapshots to ordinary text turns,
+  while this project's canonical companion model is text-only and must receive
+  normalized observations rather than raw media. Forwarding the snapshot caused
+  the GLM endpoint to reject the complete turn.
+- Upstream files and functions:
+  `src/open_llm_vtuber/conversations/conversation_handler.py::handle_conversation_trigger`;
+  `src/open_llm_vtuber/conversations/conversation_utils.py::create_batch_input`;
+  `src/open_llm_vtuber/companion_input_safety.py`.
+- Expected behavior: raw camera images are discarded before the companion call;
+  the text turn continues with a private guardrail that prevents the companion
+  from claiming it saw the user. Logs contain only the discarded image count.
+- Regression test: `tests/test_companion_input_safety.py` verifies discard,
+  metadata preservation, and text-only fallback context.
+
+### Cached service-context log redaction
+
+- Reason: verbose startup expanded the complete environment-substituted character
+  configuration, including provider credentials.
+- Upstream file and function:
+  `src/open_llm_vtuber/service_context.py::ServiceContext.load_cache`.
+- Expected behavior: debug logs include only configuration UID, character name,
+  and Live2D model name. Provider configuration and credentials are never logged.
+- Validation: start the server with `--verbose` and verify the cached-context line
+  contains only those three allowlisted identifiers.
 
 ### Silent-TTS expression dispatch
 
