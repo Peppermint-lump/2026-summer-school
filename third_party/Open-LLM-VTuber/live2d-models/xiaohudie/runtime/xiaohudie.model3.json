@@ -1,0 +1,103 @@
+{
+    "Version":  3,
+    "FileReferences":  {
+                           "Moc":  "xiaohudie.moc3",
+                           "Textures":  [
+                                            "xiaohudie.4096/texture_00.png",
+                                            "xiaohudie.4096/texture_01.png",
+                                            "xiaohudie.4096/texture_02.png",
+                                            "xiaohudie.4096/texture_03.png",
+                                            "xiaohudie.4096/texture_04.png",
+                                            "xiaohudie.4096/texture_05.png",
+                                            "xiaohudie.4096/texture_06.png",
+                                            "xiaohudie.4096/texture_07.png",
+                                            "xiaohudie.4096/texture_08.png",
+                                            "xiaohudie.4096/texture_09.png"
+                                        ],
+                           "Physics":  "xiaohudie.physics3.json",
+                           "DisplayInfo":  "xiaohudie.cdi3.json",
+                           "Expressions":  [
+                                               {
+                                                   "Name":  "neutral",
+                                                   "File":  "expressions/neutral.exp3.json"
+                                               },
+                                               {
+                                                   "Name":  "exp_01",
+                                                   "File":  "expressions/exp_01.exp3.json"
+                                               },
+                                               {
+                                                   "Name":  "exp_02",
+                                                   "File":  "expressions/exp_02.exp3.json"
+                                               },
+                                               {
+                                                   "Name":  "exp_03",
+                                                   "File":  "expressions/exp_03.exp3.json"
+                                               },
+                                               {
+                                                   "Name":  "exp_04",
+                                                   "File":  "expressions/exp_04.exp3.json"
+                                               },
+                                               {
+                                                   "Name":  "exp_05",
+                                                   "File":  "expressions/exp_05.exp3.json"
+                                               },
+                                               {
+                                                   "Name":  "exp_06",
+                                                   "File":  "expressions/exp_06.exp3.json"
+                                               },
+                                               {
+                                                   "Name":  "exp_07",
+                                                   "File":  "expressions/exp_07.exp3.json"
+                                               }
+                                           ],
+                           "Motions":  {
+                                           "Idle":  [
+                                                        {
+                                                            "File":  "motions/idle.motion3.json"
+                                                        }
+                                                    ],
+                                           "Greeting":  [
+                                                            {
+                                                                "File":  "motions/greeting.motion3.json"
+                                                            }
+                                                        ],
+                                           "CatchButterfly":  [
+                                                                  {
+                                                                      "File":  "motions/catch_butterfly.motion3.json"
+                                                                  }
+                                                              ],
+                                           "HoldBear":  [
+                                                            {
+                                                                "File":  "motions/hold_bear.motion3.json"
+                                                            }
+                                                        ]
+                                       }
+                       },
+    "Groups":  [
+                   {
+                       "Target":  "Parameter",
+                       "Name":  "EyeBlink",
+                       "Ids":  [
+                                   "ParamEyeROpen",
+                                   "ParamEyeLOpen"
+                               ]
+                   },
+                   {
+                       "Target":  "Parameter",
+                       "Name":  "LipSync",
+                       "Ids":  [
+                                   "ParamMouthOpenY"
+                               ]
+                   }
+               ],
+    "HitAreas":  [
+                   {
+                       "Id":  "HitAreaHead",
+                       "Name":  "HitAreaHead"
+                   },
+                   {
+                       "Id":  "HitAreaBody",
+                       "Name":  "HitAreaBody"
+                     }
+                 ]
+}
