@@ -33,7 +33,9 @@ def main() -> None:
 
     expression_names = [entry["Name"] for entry in references["Expressions"]]
     if len(expression_names) != 25 or len(set(expression_names)) != 25:
-        raise ValueError("Felix must register neutral, 22 supplied presets, and 2 combined presets")
+        raise ValueError(
+            "Felix must register neutral, 22 supplied presets, and 2 combined presets"
+        )
 
     groups = {group["Name"]: group["Ids"] for group in model["Groups"]}
     if groups.get("LipSync") != ["ParamMouthOpenY"]:
@@ -65,25 +67,39 @@ def main() -> None:
     if felix_character["persona_prompt"] == default_character["persona_prompt"]:
         raise ValueError("Felix and Xiaohudie personas must remain isolated")
 
-    default_voice = default_character["tts_config"]["piper_tts"]["model_path"]
-    felix_voice = felix_character["tts_config"]["piper_tts"]["model_path"]
-    if default_voice == felix_voice:
-        raise ValueError("Felix and Xiaohudie must use isolated Piper voices")
-    felix_voice_path = VTUBER_ROOT / felix_voice
-    if not felix_voice_path.is_file():
-        raise FileNotFoundError(f"Missing Felix Piper model: {felix_voice_path}")
-    felix_voice_config = felix_voice_path.with_suffix(
-        felix_voice_path.suffix + ".json"
-    )
-    if not felix_voice_config.is_file():
-        raise FileNotFoundError(
-            f"Missing Felix Piper voice configuration: {felix_voice_config}"
-        )
+    default_tts = default_character["tts_config"]
+    felix_tts = felix_character["tts_config"]
+    if default_tts["tts_model"] != "qwen3_tts_realtime":
+        raise ValueError("Xiaohudie must use Qwen3 realtime TTS")
+    if felix_tts["tts_model"] != "qwen3_tts_realtime":
+        raise ValueError("Felix must use Qwen3 realtime TTS")
+
+    default_qwen = default_tts["qwen3_tts_realtime"]
+    felix_qwen = felix_tts["qwen3_tts_realtime"]
+    if default_qwen["voice"] != "Cherry":
+        raise ValueError("Xiaohudie must use the Cherry Qwen voice")
+    if felix_qwen["voice"] != "Ethan":
+        raise ValueError("Felix must use the Ethan Qwen male voice")
+
+    default_fallback = default_qwen["fallback_model_path"]
+    felix_fallback = felix_qwen["fallback_model_path"]
+    if default_fallback == felix_fallback:
+        raise ValueError("Felix and Xiaohudie must use isolated Piper fallbacks")
+    for fallback in (default_fallback, felix_fallback):
+        model_path = VTUBER_ROOT / fallback
+        if not model_path.is_file():
+            raise FileNotFoundError(f"Missing Piper fallback model: {model_path}")
+        config_path = model_path.with_suffix(model_path.suffix + ".json")
+        if not config_path.is_file():
+            raise FileNotFoundError(
+                f"Missing Piper fallback configuration: {config_path}"
+            )
 
     print(
         "Felix validation passed: "
         f"{len(expression_names)} expressions, "
-        f"{len(felix_model['emotionMap'])} emotion tags, isolated Piper voice"
+        f"{len(felix_model['emotionMap'])} emotion tags, isolated Qwen voices, "
+        "isolated Piper fallbacks"
     )
 
 

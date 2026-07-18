@@ -152,8 +152,12 @@ character_config:
 
       zhipu_llm:
         llm_api_key: 'Your ZhiPu AI API key'
-        model: 'glm-4-flash'
-        temperature: 1.0 # value between 0 to 2
+        model: 'glm-4.7'
+        temperature: 0.35 # value between 0 to 2
+        thinking_mode: 'enabled'
+        request_timeout_seconds: 30
+        first_response_timeout_seconds: 60
+        max_retries: 1
 
       deepseek_llm:
         llm_api_key: 'Your DeepSeek API key'
@@ -269,12 +273,12 @@ character_config:
 
   # =================== Text to Speech ===================
   tts_config:
-    tts_model: 'piper_tts'
+    tts_model: 'qwen3_tts_realtime'
     # text to speech model options:
     #   'azure_tts', 'pyttsx3_tts', 'edge_tts', 'piper_tts', 'bark_tts',
     #   'cosyvoice_tts', 'melo_tts', 'coqui_tts',
     #   'fish_api_tts', 'x_tts', 'gpt_sovits_tts', 'sherpa_onnx_tts'
-    #   'minimax_tts'
+    #   'minimax_tts', 'qwen3_tts_realtime'
 
     azure_tts:
       api_key: 'azure-api-key'
@@ -294,6 +298,18 @@ character_config:
     piper_tts:
       model_path: 'models/piper/zh_CN-huayan-medium.onnx'
       timeout_seconds: 60
+
+    qwen3_tts_realtime:
+      # Leave blank to read DASHSCOPE_API_KEY from the environment.
+      api_key: ''
+      model: 'qwen3-tts-flash-realtime'
+      voice: 'Cherry' # Temporary shared voice; replace after voice selection.
+      url: 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime'
+      language_type: 'Auto'
+      sample_rate: 24000
+      timeout_seconds: 30
+      fallback_model_path: 'models/piper/zh_CN-huayan-medium.onnx'
+      fallback_timeout_seconds: 60
 
     # pyttsx3_tts doesn't have any config.
 

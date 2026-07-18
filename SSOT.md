@@ -150,7 +150,7 @@ The MVP is not considered blocked by incomplete macOS packaging if the Windows d
 
 - Open-LLM-VTuber VAD and ASR path.
 - SenseVoice / sherpa-onnx as the initial ASR stack.
-- Local Piper TTS with a bundled Chinese voice model for the first functional version.
+- Alibaba Model Studio `qwen3-tts-flash-realtime` as the primary TTS provider, with local Piper voices as the automatic offline/error fallback.
 - GLM API for:
   - text-only emotion classification;
   - companion reply generation.
@@ -195,6 +195,13 @@ The runtime copy of the “小蝴蝶” model must include:
 
 The Idle motion is required because it drives the crying and sleepy loop parameters.
 
+Xiaohudie's conversational expression policy is:
+
+- ordinary, factual, and weak-affect replies omit an expression tag;
+- `joy` is an alias of the existing star expression (index 4), while `star` remains valid;
+- `neutral` is reserved for explicit reset, uncertainty, cross-modal conflict, or safety-sensitive replies rather than being a default prefix;
+- `blush`, `sleepy`, and `cry` remain restricted to praise, explicit tiredness, and explicit strong sadness respectively.
+
 Xiaohudie special motions must remain visible for their complete presentation window:
 
 - `Greeting`: 5 seconds;
@@ -216,10 +223,11 @@ The selectable Felix runtime must include:
 - all 22 supplied expression presets registered in `model3.json`;
 - `ParamMouthOpenY` in the `LipSync` parameter group;
 - an isolated `felix_001` character configuration and persona;
-- the local `zh_CN-chaowen-medium` Piper voice, isolated from Xiaohudie's `zh_CN-huayan-medium` voice;
+- `qwen3-tts-flash-realtime` as the primary TTS model; Xiaohudie uses the female `Cherry` voice and Felix uses the male `Ethan` voice;
+- the local `zh_CN-chaowen-medium` Piper fallback voice, isolated from Xiaohudie's `zh_CN-huayan-medium` fallback voice;
 - no automatic use of outfit, prop, or pose presets as conversational emotions.
 
-Switching to Felix changes the Live2D model, persona, and TTS voice together. Switching back restores the Xiaohudie model, persona, and voice. Xiaohudie remains the startup default.
+Switching to Felix changes the Live2D model, persona, and per-character TTS configuration together. Qwen primary voices and Piper fallback voices are isolated by character. Switching back restores the Xiaohudie configuration. Xiaohudie remains the startup default.
 
 ---
 

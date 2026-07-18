@@ -64,6 +64,14 @@ class OpenAICompatibleConfig(StatelessLLMBaseConfig):
     organization_id: str | None = Field(None, alias="organization_id")
     project_id: str | None = Field(None, alias="project_id")
     temperature: float = Field(1.0, alias="temperature")
+    request_timeout_seconds: float = Field(30.0, alias="request_timeout_seconds", gt=0)
+    first_response_timeout_seconds: float = Field(
+        20.0, alias="first_response_timeout_seconds", gt=0
+    )
+    max_retries: int = Field(1, alias="max_retries", ge=0, le=3)
+    thinking_mode: Literal["provider_default", "enabled", "disabled"] = Field(
+        "provider_default", alias="thinking_mode"
+    )
 
     _OPENAI_COMPATIBLE_DESCRIPTIONS: ClassVar[dict[str, Description]] = {
         "base_url": Description(en="Base URL for the API endpoint", zh="API的URL端点"),
@@ -78,6 +86,22 @@ class OpenAICompatibleConfig(StatelessLLMBaseConfig):
         "temperature": Description(
             en="What sampling temperature to use, between 0 and 2.",
             zh="使用的采样温度，介于 0 和 2 之间。",
+        ),
+        "request_timeout_seconds": Description(
+            en="Maximum time for an LLM network operation",
+            zh="LLM 网络操作的最长等待时间（秒）",
+        ),
+        "first_response_timeout_seconds": Description(
+            en="Maximum total wait for the first visible response text",
+            zh="首段可见回复文本的最长总等待时间（秒）",
+        ),
+        "max_retries": Description(
+            en="Maximum SDK retries within the first-response deadline",
+            zh="首段回复截止时间内允许的 SDK 最大重试次数",
+        ),
+        "thinking_mode": Description(
+            en="Provider thinking mode override",
+            zh="服务商思考模式覆盖设置",
         ),
     }
 
