@@ -48,6 +48,10 @@ emotion:
     minimum_quality: 0.45
     action_minimum_confidence: 0.60
     action_emotion_weight: 0.25
+    continuous_enabled: false
+    continuous_window_seconds: 3
+    continuous_interval_seconds: 2
+    action_cooldown_seconds: 5
   text:
     enabled: false
     provider: glm
@@ -80,6 +84,7 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(config.video_emotion.enabled)
             self.assertFalse(config.audio_emotion.enabled)
             self.assertEqual(config.video_emotion.model, "mimo-v2.5")
+            self.assertEqual(config.video_emotion.continuous_window_seconds, 3)
 
     def test_rejects_prompt_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -109,6 +114,10 @@ class ConfigTests(unittest.TestCase):
                     "TEXT_EMOTION_ENABLED": "true",
                     "VIDEO_EMOTION_PROVIDER": "mimo",
                     "VIDEO_EMOTION_TIMEOUT_SECONDS": "45",
+                    "VIDEO_CONTINUOUS_ENABLED": "true",
+                    "VIDEO_CONTINUOUS_WINDOW_SECONDS": "4",
+                    "VIDEO_CONTINUOUS_INTERVAL_SECONDS": "1.5",
+                    "VIDEO_ACTION_COOLDOWN_SECONDS": "7",
                     "AUDIO_EMOTION_TIMEOUT_SECONDS": "40",
                     "MIMO_MODEL": "mimo-test-model",
                     "MIMO_BASE_URL": "https://mimo.example/v1",
@@ -126,6 +135,10 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(config.video_emotion.model, "mimo-test-model")
             self.assertEqual(config.video_emotion.base_url, "https://mimo.example/v1")
             self.assertEqual(config.video_emotion.timeout_seconds, 45)
+            self.assertTrue(config.video_emotion.continuous_enabled)
+            self.assertEqual(config.video_emotion.continuous_window_seconds, 4)
+            self.assertEqual(config.video_emotion.continuous_interval_seconds, 1.5)
+            self.assertEqual(config.video_emotion.action_cooldown_seconds, 7)
             self.assertEqual(config.text_emotion.model, "glm-test-model")
             self.assertEqual(config.text_emotion.timeout_seconds, 30)
             self.assertTrue(config.text_emotion.enabled)

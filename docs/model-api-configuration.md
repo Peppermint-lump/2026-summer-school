@@ -56,12 +56,18 @@ Keep cloud analysis disabled while editing the file. After filling the MiMo key,
 set:
 
 ```dotenv
-CAMERA_ENABLED=false
+CAMERA_ENABLED=true
 VIDEO_EMOTION_ENABLED=true
+VIDEO_CONTINUOUS_ENABLED=true
+VIDEO_CONTINUOUS_WINDOW_SECONDS=3
+VIDEO_CONTINUOUS_INTERVAL_SECONDS=2
+VIDEO_ACTION_COOLDOWN_SECONDS=5
 AUDIO_EMOTION_ENABLED=true
 TEXT_EMOTION_ENABLED=true
 ```
 
+The continuous settings analyze the latest ordered three-second window every two
+seconds and suppress repeated `wave -> greeting` dispatches for five seconds.
 With `CAMERA_ENABLED=false`, MiMo video returns `disabled` without opening a
 device; microphone turns still send raw turn audio to MiMo audio after ASR, and
 the transcript independently goes to GLM text emotion.

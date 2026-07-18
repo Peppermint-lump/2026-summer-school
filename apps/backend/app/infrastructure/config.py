@@ -120,6 +120,26 @@ def load_app_config(
                 minimum_quality=_number(video, "minimum_quality"),
                 action_minimum_confidence=_number(video, "action_minimum_confidence"),
                 action_emotion_weight=_number(video, "action_emotion_weight"),
+                continuous_enabled=_environment_boolean(
+                    effective_environment,
+                    "VIDEO_CONTINUOUS_ENABLED",
+                    default=_boolean(video, "continuous_enabled"),
+                ),
+                continuous_window_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_CONTINUOUS_WINDOW_SECONDS",
+                    default=_number(video, "continuous_window_seconds"),
+                ),
+                continuous_interval_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_CONTINUOUS_INTERVAL_SECONDS",
+                    default=_number(video, "continuous_interval_seconds"),
+                ),
+                action_cooldown_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_ACTION_COOLDOWN_SECONDS",
+                    default=_number(video, "action_cooldown_seconds"),
+                ),
             ),
             audio_emotion=AudioAnalysisConfig(
                 enabled=_environment_boolean(

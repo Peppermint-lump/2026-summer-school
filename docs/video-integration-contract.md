@@ -28,7 +28,9 @@ ModalityEmotion(text/audio/video) -> fusion -> companion -> avatar
 - `speech_start_ms` 与 `speech_end_ms` 为闭区间。
 - `speech_end_ms >= speech_start_ms`。
 - 摄像头帧必须在采集时立即附加同一时钟来源的时间戳。
-- 集成侧只能请求当前 `turn_id` 的时间范围，视频侧不得跨 turn 混用帧。
+- 说话轮次只能请求当前 `turn_id` 的时间范围，视频侧不得跨 turn 混用帧。
+- 独立视觉观察使用 `visual_<unix_ms>` 标识和最近 3 秒的有序帧窗口，绝不附带
+  transcript 或 audio。
 
 ## 3. `TurnRecord` 1.0
 
@@ -101,6 +103,18 @@ ModalityEmotion(text/audio/video) -> fusion -> companion -> avatar
 3. 视频侧完成质量评估；证据不足时不调用 Provider。
 4. Provider 成功、失败、超时或任务取消后，均进入清理阶段。
 5. 默认删除当前 turn 的帧和视频；只有显式 debug-retention 配置可以保留。
+
+### 6.1 自动视觉观察
+
+- 正式启动器在摄像头与视频分析均启用时启动唯一后台观察器；
+- 默认每 2 秒分析最近 3 秒窗口；摄像头以 10 FPS 缓存并均匀抽取约
+  5 FPS/15 张有序帧，不要求文本、语音或手动按钮；
+- 最新结果通过已鉴权的 `GET /v1/visual/latest` 暴露给上游适配器；
+- Open-LLM-VTuber 每 0.5 秒检查序号，只推送新结果；
+- `wave` 映射为 `greeting`，相同问候动作默认 5 秒内不重复执行；
+- 说话期间后台观察器仍工作，因此明确动作可以即时驱动 Live2D；说话结束后，
+  原有按轮次三模态分析独立完成加权和最终表情；
+- 视觉事件只驱动动作/表情，不触发聊天模型、TTS 或主动语言回复。
 
 ## 7. 集成验收示例
 

@@ -62,6 +62,11 @@ The same launcher also starts the authenticated canonical emotion middleware at
 the child-process environment. Set `CAMERA_ENABLED=false` to keep the camera
 closed; audio and text turns continue normally.
 
+When `CAMERA_ENABLED=true`, `VIDEO_EMOTION_ENABLED=true`, and
+`VIDEO_CONTINUOUS_ENABLED=true`, the launcher automatically starts independent
+video-only analysis. No microphone, text message, preview click, or analysis
+button is required. The browser “直播” pane is only a local preview.
+
 Metadata-only per-turn traces are written to:
 
 ```text

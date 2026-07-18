@@ -7,6 +7,7 @@ import base64
 import binascii
 import json
 import re
+import threading
 import time
 from dataclasses import asdict, is_dataclass
 from enum import Enum
@@ -36,6 +37,9 @@ class LoopbackEmotionServer:
         runtime: EmotionRuntime,
         runtime_root: Path,
         debug_output_root: Path,
+        continuous_visual_enabled: bool = False,
+        continuous_visual_window_seconds: float = 3.0,
+        continuous_visual_interval_seconds: float = 2.0,
     ) -> None:
         if host not in {"127.0.0.1", "localhost"}:
             raise ValueError("emotion server must bind to loopback")
@@ -44,10 +48,22 @@ class LoopbackEmotionServer:
         self._runtime = runtime
         self._runtime_root = runtime_root.resolve()
         self._trace_store = DebugTraceStore(debug_output_root.resolve())
+        self._continuous_visual_enabled = (
+            continuous_visual_enabled and runtime.camera_enabled
+        )
+        self._continuous_visual_window_seconds = continuous_visual_window_seconds
+        self._continuous_visual_interval_seconds = continuous_visual_interval_seconds
+        self._analysis_lock = threading.Lock()
+        self._visual_lock = threading.Lock()
+        self._visual_stop = threading.Event()
+        self._visual_thread: threading.Thread | None = None
+        self._visual_sequence = 0
+        self._latest_visual: dict[str, Any] | None = None
         handler = _handler_factory(
             token=token,
             analyze=self._analyze_payload,
             health=self._health_payload,
+            latest_visual=self._latest_visual_payload,
         )
         self._server = ThreadingHTTPServer((host, port), handler)
 
@@ -57,9 +73,11 @@ class LoopbackEmotionServer:
 
     def serve_forever(self) -> None:
         self._runtime.start()
+        self._start_continuous_visual()
         try:
             self._server.serve_forever(poll_interval=0.25)
         finally:
+            self._stop_continuous_visual()
             self._server.server_close()
             self._runtime.stop()
 
@@ -68,8 +86,83 @@ class LoopbackEmotionServer:
             "status": "ok",
             "camera_enabled": self._runtime.camera_enabled,
             "camera_state": self._runtime.camera.state.value,
+            "continuous_visual_enabled": self._continuous_visual_enabled,
+            "continuous_visual_sequence": self._visual_sequence,
             "raw_media_retained": False,
         }
+
+    def _start_continuous_visual(self) -> None:
+        if not self._continuous_visual_enabled:
+            return
+        self._visual_stop.clear()
+        self._visual_thread = threading.Thread(
+            target=self._continuous_visual_loop,
+            name="continuous-visual-analysis",
+            daemon=True,
+        )
+        self._visual_thread.start()
+
+    def _stop_continuous_visual(self) -> None:
+        self._visual_stop.set()
+        if self._visual_thread is not None:
+            self._visual_thread.join(timeout=2.0)
+            self._visual_thread = None
+
+    def _continuous_visual_loop(self) -> None:
+        if self._visual_stop.wait(self._continuous_visual_window_seconds):
+            return
+        while not self._visual_stop.is_set():
+            end_ms = time.time_ns() // 1_000_000
+            window_ms = round(self._continuous_visual_window_seconds * 1000)
+            turn_id = f"visual_{end_ms}"
+            try:
+                response = self._analyze_payload(
+                    {
+                        "session_id": "continuous_visual",
+                        "turn_id": turn_id,
+                        "speech_start_ms": max(0, end_ms - window_ms),
+                        "speech_end_ms": end_ms,
+                        "transcript": None,
+                        "audio_wav_base64": None,
+                    }
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                print(
+                    "continuous visual analysis failed "
+                    f"turn_id={turn_id} error={type(exc).__name__}",
+                    flush=True,
+                )
+            else:
+                with self._visual_lock:
+                    self._visual_sequence += 1
+                    self._latest_visual = response
+                video: dict[str, Any] = next(
+                    (
+                        observation
+                        for observation in response["analysis"]["observations"]
+                        if observation["modality"] == "video"
+                    ),
+                    {},
+                )
+                actions = [
+                    item.get("action") for item in video.get("observed_actions", [])
+                ]
+                print(
+                    "continuous visual analysis complete "
+                    f"turn_id={turn_id} label={video.get('label', 'unknown')} "
+                    f"actions={actions} reliability={video.get('reliability', 0)}",
+                    flush=True,
+                )
+            if self._visual_stop.wait(self._continuous_visual_interval_seconds):
+                return
+
+    def _latest_visual_payload(self) -> dict[str, Any]:
+        with self._visual_lock:
+            return {
+                "available": self._latest_visual is not None,
+                "sequence": self._visual_sequence,
+                "result": self._latest_visual,
+            }
 
     def _analyze_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         session_id = _required_identifier(payload, "session_id")
@@ -106,14 +199,13 @@ class LoopbackEmotionServer:
                 "raw_media_logged": False,
             },
         )
-        result = asyncio.run(self._runtime.middleware.analyze_turn(turn))
+        with self._analysis_lock:
+            result = asyncio.run(self._runtime.middleware.analyze_turn(turn))
         response = _result_payload(result)
         response["turn_id"] = turn_id
         response["latency_ms"] = round((time.monotonic() - started) * 1000)
         response["companion_context"] = _companion_context(result)
-        response["trace_directory"] = str(
-            self._trace_store.turn_directory(turn_id)
-        )
+        response["trace_directory"] = str(self._trace_store.turn_directory(turn_id))
         observations = {
             item.modality.value: _jsonable(item)
             for item in result.analysis.observations
@@ -138,9 +230,7 @@ class LoopbackEmotionServer:
             "05_avatar_state.json",
             cast(dict[str, Any], _jsonable(result.avatar_state)),
         )
-        temporary_media_remains = (
-            self._runtime_root / "turns" / turn_id
-        ).exists()
+        temporary_media_remains = (self._runtime_root / "turns" / turn_id).exists()
         self._trace_store.write_stage(
             turn_id,
             "06_cleanup.json",
@@ -179,6 +269,7 @@ def _handler_factory(
     token: str,
     analyze: Any,
     health: Any,
+    latest_visual: Any,
 ) -> type[BaseHTTPRequestHandler]:
     class EmotionRequestHandler(BaseHTTPRequestHandler):
         server_version = "EmotionLoopback/1.0"
@@ -187,10 +278,18 @@ def _handler_factory(
             if not self._authorized():
                 self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
                 return
+            if self.path == "/health":
+                self._send_json(HTTPStatus.OK, cast(dict[str, Any], health()))
+                return
+            if self.path == "/v1/visual/latest":
+                self._send_json(
+                    HTTPStatus.OK,
+                    cast(dict[str, Any], latest_visual()),
+                )
+                return
             if self.path != "/health":
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                 return
-            self._send_json(HTTPStatus.OK, cast(dict[str, Any], health()))
 
         def do_POST(self) -> None:  # noqa: N802 - stdlib handler API
             if not self._authorized():
@@ -232,7 +331,10 @@ def _handler_factory(
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(encoded)))
             self.end_headers()
-            self.wfile.write(encoded)
+            try:
+                self.wfile.write(encoded)
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
     return EmotionRequestHandler
 

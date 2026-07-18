@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from apps.backend.app.emotion.providers.base import (
     ProviderError,
@@ -67,6 +67,15 @@ class VideoEmotionService:
         try:
             async with asyncio.timeout(self.config.provider_timeout_seconds):
                 observation = await self._provider.analyze_video(request)
+                observation = replace(
+                    observation,
+                    raw_metadata={
+                        **observation.raw_metadata,
+                        "captured_frame_count": artifact.captured_frame_count,
+                        "sampled_frame_count": artifact.sampled_frame_count,
+                        "quality_reasons": artifact.quality_reasons,
+                    },
+                )
                 return apply_action_emotion(observation, self.config.action_emotion)
         except TimeoutError:
             return _fallback_result(

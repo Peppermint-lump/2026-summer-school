@@ -86,6 +86,24 @@ possible.
   middleware lifecycle tests, and a live microphone turn with metadata traces under
   `runtime/debug/emotion_turns/`.
 
+### Continuous video-only avatar updates
+
+- Reason: upstream camera preview does not perform canonical visual inference and
+  visual analysis previously ran only after a text or microphone turn. The product
+  requires visible actions to affect the avatar even when the user is silent.
+- Upstream files and functions:
+  `src/open_llm_vtuber/emotion_middleware_client.py::latest_visual`;
+  `src/open_llm_vtuber/websocket_handler.py::_monitor_visual_emotion`;
+  `frontend/avatar-state-bridge.js`.
+- Expected behavior: one canonical backend worker analyzes ordered three-second
+  video-only windows every two seconds. Connected clients poll only metadata and
+  receive new `emotion-analysis` and `avatar-state` messages. `wave` immediately
+  drives `Greeting`; repeated greetings are suppressed for five seconds. This path
+  never invokes chat, ASR, audio emotion, or TTS. The browser “直播” view remains a
+  debug preview and is not used as provider input.
+- Regression tests: `tests/test_emotion_middleware_client.py` validates monotonic
+  sequence parsing; `tests/test_continuous_visual_motion.py` validates cooldown.
+
 ### Cached service-context log redaction
 
 - Reason: verbose startup expanded the complete environment-substituted character

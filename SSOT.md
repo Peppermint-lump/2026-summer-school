@@ -95,20 +95,23 @@ The application:
 2. requests microphone permission;
 3. optionally requests camera permission;
 4. loads the Live2D avatar;
-5. waits for the user to speak;
-6. creates one interaction turn from speech start to speech end;
-7. obtains:
+5. when camera permission has been granted and visual analysis is enabled,
+   continuously samples bounded visual windows and independently updates the
+   avatar from video-only observations;
+6. waits for the user to speak;
+7. creates one interaction turn from speech start to speech end;
+8. obtains:
    - ASR transcript;
    - audio-only emotion observation;
    - video-only emotion observation;
    - text-only emotion observation;
-8. computes modality reliability;
-9. detects consistency or conflict;
-10. selects a companion strategy;
-11. generates a reply;
-12. plays TTS;
-13. drives Live2D lip sync and expression;
-14. removes temporary media unless retention is explicitly enabled.
+9. computes modality reliability;
+10. detects consistency or conflict;
+11. selects a companion strategy;
+12. generates a reply;
+13. plays TTS;
+14. drives Live2D lip sync and expression;
+15. removes temporary media unless retention is explicitly enabled.
 
 The application must remain usable when the camera is disabled.
 
@@ -452,11 +455,14 @@ Example forbidden style:
 ### Default
 
 - camera processing is opt-in;
+- after the user enables camera processing, a visible in-app indicator remains
+  active while bounded visual windows are analyzed periodically;
 - raw audio/video is temporary;
 - temporary files are deleted after inference;
 - conversation and media are not retained by default;
 - logs store metadata, not raw media;
-- provider uploads are limited to the current turn;
+- provider uploads are limited to the current interaction turn or the current
+  bounded continuous-visual window;
 - user-facing settings must allow disabling video analysis.
 
 ### Debug mode
@@ -592,7 +598,7 @@ Provider-generated confidence must not be reported as calibrated accuracy.
 
 ## 20. Explicitly out of scope for MVP
 
-- continuous full-duplex multimodal streaming;
+- continuous full-duplex audio/video transport to one joint model;
 - training a new multimodal foundation model;
 - fine-tuning MiMo, Qwen, or GLM;
 - persistent psychological profiles;

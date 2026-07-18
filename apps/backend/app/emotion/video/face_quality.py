@@ -83,6 +83,12 @@ class VideoQualityReport:
     def has_sufficient_evidence(self) -> bool:
         return self.total_frames > 0 and "no_valid_face" not in self.reasons
 
+    @property
+    def has_action_evidence(self) -> bool:
+        """Body actions can remain visible when a frontal face is not detected."""
+        blocking_reasons = {"no_frames_in_turn", "too_dark", "overexposed", "blurred"}
+        return self.total_frames > 0 and not blocking_reasons.intersection(self.reasons)
+
 
 def _to_grayscale(frame: NDArray[np.uint8]) -> NDArray[np.uint8]:
     if frame.ndim == 2:

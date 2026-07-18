@@ -10,6 +10,7 @@ import numpy as np
 from src.open_llm_vtuber.emotion_middleware_client import (
     _encode_audio_wav,
     _parse_result,
+    _parse_visual_update,
     apply_emotion_context,
 )
 
@@ -64,6 +65,24 @@ class EmotionMiddlewareClientTests(unittest.TestCase):
         )
         self.assertIn("text=positive", combined)
         self.assertNotIn(raw_audio, combined)
+
+    def test_visual_update_is_emitted_only_for_a_new_sequence(self) -> None:
+        payload = {
+            "available": True,
+            "sequence": 4,
+            "result": {
+                "turn_id": "visual_4",
+                "companion_context": "video only",
+                "trace_directory": "/tmp/debug/visual_4",
+                "avatar_state": {"expression": "heart", "motion": "greeting"},
+            },
+        }
+        update = _parse_visual_update(payload, 3)
+        self.assertIsNotNone(update)
+        assert update is not None
+        self.assertEqual(update[0], 4)
+        self.assertEqual(update[1].motion, "greeting")
+        self.assertIsNone(_parse_visual_update(payload, 4))
 
 
 if __name__ == "__main__":

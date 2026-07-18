@@ -50,14 +50,20 @@ def main() -> int:
             token=token,
             runtime=runtime,
             runtime_root=REPOSITORY_ROOT / "runtime",
-            debug_output_root=(
-                REPOSITORY_ROOT / "runtime" / "debug" / "emotion_turns"
+            debug_output_root=(REPOSITORY_ROOT / "runtime" / "debug" / "emotion_turns"),
+            continuous_visual_enabled=config.video_emotion.continuous_enabled,
+            continuous_visual_window_seconds=(
+                config.video_emotion.continuous_window_seconds
+            ),
+            continuous_visual_interval_seconds=(
+                config.video_emotion.continuous_interval_seconds
             ),
         )
         print(
             "emotion backend ready "
             f"host={args.host} port={server.port} "
-            f"camera_enabled={runtime.camera_enabled}",
+            f"camera_enabled={runtime.camera_enabled} "
+            f"continuous_visual={config.video_emotion.continuous_enabled}",
             flush=True,
         )
         server.serve_forever()

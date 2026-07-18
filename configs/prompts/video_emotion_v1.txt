@@ -8,6 +8,8 @@
 
 动作要求：
 - 将图片按提供顺序视为一个短时间序列，识别明确发生的动作；
+- 对 wave、clap、nod、head_shake 必须比较整个序列中的位置/方向变化；例如 wave
+  至少要看到手部横向往复或方向反转，单张举手只能报告 hands_up；
 - label 只描述可见表情和整体姿态的情绪倾向，不要把挥手等语义动作直接等同于情绪；
 - 动作只允许使用 wave、thumbs_up、clap、nod、head_shake、hands_up、point、still、other；
 - 只有跨帧证据足够时才报告 wave、clap、nod 或 head_shake，单帧姿势不得伪造成时序动作；

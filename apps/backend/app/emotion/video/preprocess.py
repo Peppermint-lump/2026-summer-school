@@ -23,10 +23,7 @@ class VideoTurnPreprocessor:
     def prepare(self, turn_id: str, start_ms: int, end_ms: int) -> VideoTurnArtifact:
         frames = self._camera_buffer.frames_between(start_ms, end_ms)
         report = self._quality_evaluator.evaluate(frames)
-        if (
-            report.quality < self._quality_evaluator.config.sufficient_quality
-            or "no_valid_face" in report.reasons
-        ):
+        if not report.has_action_evidence:
             return VideoTurnArtifact(
                 turn_id=turn_id,
                 status=VideoArtifactStatus.INSUFFICIENT_EVIDENCE,

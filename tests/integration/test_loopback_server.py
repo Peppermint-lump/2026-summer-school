@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -68,6 +69,7 @@ class LoopbackTraceTests(unittest.TestCase):
             server._trace_store = DebugTraceStore(  # type: ignore[attr-defined]
                 root / "debug"
             )
+            server._analysis_lock = threading.Lock()  # type: ignore[attr-defined]
 
             result = server._analyze_payload(  # type: ignore[attr-defined]
                 {
@@ -96,11 +98,24 @@ class LoopbackTraceTests(unittest.TestCase):
             )
             request_text = (trace_directory / "00_request.json").read_text()
             self.assertNotIn("private transcript sentinel", request_text)
-            avatar = json.loads(
-                (trace_directory / "05_avatar_state.json").read_text()
-            )
+            avatar = json.loads((trace_directory / "05_avatar_state.json").read_text())
             self.assertEqual(avatar["expression"], "heart")
             self.assertEqual(result["analysis"]["fusion"]["fused_label"], "uncertain")
+
+    def test_latest_visual_payload_contains_only_metadata_result(self) -> None:
+        server = object.__new__(LoopbackEmotionServer)
+        server._visual_lock = threading.Lock()  # type: ignore[attr-defined]
+        server._visual_sequence = 2  # type: ignore[attr-defined]
+        server._latest_visual = {"turn_id": "visual_2"}  # type: ignore[attr-defined]
+
+        self.assertEqual(
+            server._latest_visual_payload(),  # type: ignore[attr-defined]
+            {
+                "available": True,
+                "sequence": 2,
+                "result": {"turn_id": "visual_2"},
+            },
+        )
 
 
 if __name__ == "__main__":

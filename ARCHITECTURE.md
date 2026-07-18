@@ -496,6 +496,15 @@ transcript ──────────────┤
 
 Text, audio, and video analysis should run concurrently after their inputs are ready.
 
+### 8.1 Continuous video-only observation
+
+After explicit camera consent, one backend worker periodically analyzes a bounded
+ordered-frame window. It sends neither transcript nor audio to the video provider.
+The latest canonical video observation is published to connected VTuber clients,
+which update Live2D immediately without waiting for a speech or text turn. The
+worker is single-instance, skips overlapping runs, retains no raw frames after
+inference, and stops with the backend.
+
 ---
 
 ## 9. Canonical schemas

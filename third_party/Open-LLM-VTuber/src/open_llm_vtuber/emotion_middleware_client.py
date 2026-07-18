@@ -96,6 +96,25 @@ class EmotionMiddlewareClient:
             )
             return None
 
+    async def latest_visual(
+        self, *, after_sequence: int
+    ) -> Optional[tuple[int, EmotionMiddlewareResult]]:
+        """Return a new canonical video-only observation without media payloads."""
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+                response = await client.get(
+                    f"{self._base_url}/v1/visual/latest",
+                    headers={"Authorization": f"Bearer {self._token}"},
+                )
+            response.raise_for_status()
+            return _parse_visual_update(response.json(), after_sequence)
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            logger.warning(
+                "Continuous visual middleware poll failed open: {}",
+                type(exc).__name__,
+            )
+            return None
+
 
 def _encode_audio_wav(
     raw_audio: Optional[np.ndarray], sample_rate: int
@@ -154,6 +173,19 @@ def _parse_result(payload: Any) -> EmotionMiddlewareResult:
         trace_directory=trace_directory,
         payload=payload,
     )
+
+
+def _parse_visual_update(
+    payload: Any, after_sequence: int
+) -> Optional[tuple[int, EmotionMiddlewareResult]]:
+    if not isinstance(payload, dict):
+        raise ValueError("visual update response must be an object")
+    sequence = payload.get("sequence")
+    if not isinstance(sequence, int):
+        raise ValueError("visual update sequence must be an integer")
+    if not payload.get("available") or sequence <= after_sequence:
+        return None
+    return sequence, _parse_result(payload.get("result"))
 
 
 def apply_emotion_context(

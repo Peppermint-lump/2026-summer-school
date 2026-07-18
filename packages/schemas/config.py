@@ -43,6 +43,10 @@ class VideoAnalysisConfig:
     minimum_quality: float = 0.45
     action_minimum_confidence: float = 0.60
     action_emotion_weight: float = 0.25
+    continuous_enabled: bool = False
+    continuous_window_seconds: float = 3.0
+    continuous_interval_seconds: float = 2.0
+    action_cooldown_seconds: float = 5.0
 
     def __post_init__(self) -> None:
         if self.provider != "mimo":
@@ -55,6 +59,12 @@ class VideoAnalysisConfig:
             raise ValueError("action_minimum_confidence must be between 0 and 1")
         if not 0.0 <= self.action_emotion_weight <= 0.5:
             raise ValueError("action_emotion_weight must be between 0 and 0.5")
+        if self.continuous_window_seconds <= 0:
+            raise ValueError("continuous video window must be positive")
+        if self.continuous_interval_seconds <= 0:
+            raise ValueError("continuous video interval must be positive")
+        if self.action_cooldown_seconds < 0:
+            raise ValueError("continuous action cooldown must be non-negative")
         if not self.prompt_version or not self.api_key_secret_name:
             raise ValueError("prompt version and secret name must be non-empty")
 

@@ -6,8 +6,8 @@ capture:
     height: 480
     target_fps: 10
     buffer_seconds: 30
-    sample_fps: 2
-    max_sampled_frames: 12
+    sample_fps: 5
+    max_sampled_frames: 15
     retain_media: false
 
 emotion:
@@ -36,6 +36,10 @@ emotion:
     minimum_quality: 0.45
     action_minimum_confidence: 0.60
     action_emotion_weight: 0.25
+    continuous_enabled: false  # 用户授权摄像头后可开启周期视觉观察
+    continuous_window_seconds: 3
+    continuous_interval_seconds: 2
+    action_cooldown_seconds: 5
   text:
     enabled: false
     provider: glm

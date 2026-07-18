@@ -59,7 +59,7 @@ class VideoPreprocessIntegrationTests(unittest.TestCase):
             )
             self.assertFalse((Path(temporary) / "turns" / "turn_2").exists())
 
-    def test_no_valid_face_never_reaches_export_even_with_low_threshold(self) -> None:
+    def test_clear_frames_without_face_still_reach_action_provider(self) -> None:
         class NoFaceDetector:
             def detect(self, _frame: NDArray[np.uint8]) -> Sequence[FaceBox]:
                 return ()
@@ -78,12 +78,26 @@ class VideoPreprocessIntegrationTests(unittest.TestCase):
                 FrameExporter(Path(temporary)),
             )
             artifact = preprocessor.prepare("turn_3", 100, 100)
-            self.assertEqual(
-                artifact.status,
-                VideoArtifactStatus.INSUFFICIENT_EVIDENCE,
-            )
+            self.assertEqual(artifact.status, VideoArtifactStatus.OK)
             self.assertIn("no_valid_face", artifact.quality_reasons)
-            self.assertFalse((Path(temporary) / "turns" / "turn_3").exists())
+            self.assertTrue(artifact.frame_paths)
+
+    def test_dark_frames_without_face_do_not_reach_provider(self) -> None:
+        class NoFaceDetector:
+            def detect(self, _frame: NDArray[np.uint8]) -> Sequence[FaceBox]:
+                return ()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            camera = CameraBuffer()
+            camera.append_frame(100, np.zeros((100, 100, 3), dtype=np.uint8))
+            preprocessor = VideoTurnPreprocessor(
+                camera,
+                FaceQualityEvaluator(NoFaceDetector()),
+                FrameExporter(Path(temporary)),
+            )
+            artifact = preprocessor.prepare("turn_4", 100, 100)
+            self.assertEqual(artifact.status, VideoArtifactStatus.INSUFFICIENT_EVIDENCE)
+            self.assertIn("too_dark", artifact.quality_reasons)
 
 
 if __name__ == "__main__":
