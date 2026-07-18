@@ -84,6 +84,15 @@ def _cooldown_motion(
     return motion, motion, updated
 
 
+def _visual_expression_index(
+    expression_indices: List[int], *, conversation_active: bool
+) -> Optional[int]:
+    """Protect the authoritative fused expression while a turn is active."""
+    if conversation_active or not expression_indices:
+        return None
+    return expression_indices[0]
+
+
 class WebSocketHandler:
     """Handles WebSocket connections and message routing"""
 
@@ -396,8 +405,16 @@ class WebSocketHandler:
                         last_emitted_at=last_emitted_at,
                         cooldown_seconds=cooldown_seconds,
                     )
+                    conversation_task = self.current_conversation_tasks.get(client_uid)
+                    conversation_active = (
+                        conversation_task is not None and not conversation_task.done()
+                    )
                     await self._send_visual_emotion(
-                        websocket, context, result, motion=motion
+                        websocket,
+                        context,
+                        result,
+                        motion=motion,
+                        conversation_active=conversation_active,
                     )
                 await asyncio.sleep(0.5)
         except asyncio.CancelledError:
@@ -412,10 +429,15 @@ class WebSocketHandler:
         result: EmotionMiddlewareResult,
         *,
         motion: str,
+        conversation_active: bool,
     ) -> None:
         expression_indices = context.live2d_model.extract_emotion(
             f"[{result.expression}]"
         )[:1]
+        expression_index = _visual_expression_index(
+            expression_indices,
+            conversation_active=conversation_active,
+        )
         await websocket.send_text(
             json.dumps(
                 {
@@ -436,17 +458,17 @@ class WebSocketHandler:
                     "source": "continuous-video",
                     "turn_id": result.turn_id,
                     "expression": result.expression,
-                    "expression_index": (
-                        expression_indices[0] if expression_indices else None
-                    ),
+                    "expression_index": expression_index,
+                    "expression_suppressed": conversation_active,
                     "motion": motion,
                 }
             )
         )
         logger.info(
-            "Continuous visual update turn={} expression={} motion={} trace={}",
+            "Continuous visual update turn={} expression={} expression_suppressed={} motion={} trace={}",
             result.turn_id,
             result.expression,
+            conversation_active,
             motion,
             result.trace_directory or "disabled",
         )

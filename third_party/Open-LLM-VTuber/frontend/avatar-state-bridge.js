@@ -106,9 +106,15 @@
       panel.dataset.motion = payload.motion || "idle";
       const withoutMotion = panel.textContent
         .split("\n")
-        .filter((line) => !line.startsWith("角色动作："));
+        .filter((line) =>
+          !line.startsWith("角色动作：") &&
+          !line.startsWith("融合表情保护：")
+        );
       panel.textContent = withoutMotion
         .concat(`角色动作：${payload.motion || "idle"}`)
+        .concat(
+          `融合表情保护：${payload.expression_suppressed ? "开启" : "关闭"}`,
+        )
         .join("\n");
       panel.title = [
         panel.title,

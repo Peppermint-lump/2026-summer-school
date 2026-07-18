@@ -113,6 +113,27 @@ possible.
   `tests/test_continuous_visual_motion.py` validates edge/cooldown gating;
   `tests/test_avatar_motion_controller.js` validates motion, restoration, and Idle.
 
+### Typed-turn visual alignment and fused-expression arbitration
+
+- Reason: a typed input has no audio duration, so using its speech interval for
+  frame selection produced a zero-length video window. Continuous visual results
+  then moved the avatar independently but did not participate in the typed turn's
+  deterministic emotion fusion.
+- Upstream files: `src/open_llm_vtuber/emotion_middleware_client.py`;
+  `src/open_llm_vtuber/websocket_handler.py`; `frontend/avatar-state-bridge.js`.
+- Expected behavior: a typed request keeps truthful zero-duration speech bounds and
+  sends a separate three-second visual window. GLM text and MiMo video observations
+  are fused by the canonical backend. While the conversation task is active,
+  continuous video still emits motion but sends no expression index, preserving the
+  fused expression through the reply lifecycle. Discarding the browser's raw image
+  no longer injects a contradictory "visual unavailable" prompt when that turn has
+  a successful canonical video observation; failed or insufficient video still
+  degrades to the safety prompt.
+- Regression tests: `tests/test_emotion_middleware_client.py` validates typed/audio
+  timing and canonical visual availability; `tests/test_continuous_visual_motion.py`
+  validates expression suppression; the repository safety tests validate both
+  visual-observed and visual-unavailable prompt paths.
+
 ### Cached service-context log redaction
 
 - Reason: verbose startup expanded the complete environment-substituted character

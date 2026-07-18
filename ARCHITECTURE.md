@@ -905,6 +905,13 @@ Canonical visual-event motions are deterministic and bounded: `wave` may select
 select the neutral `observe` fallback. `observe` must preserve the selected expression, must not trigger a
 companion reply, and yields to authored special motions before returning to Idle.
 
+For a typed turn, `speech_start_ms == speech_end_ms` remains truthful. Optional
+`visual_start_ms` and `visual_end_ms` identify the recent camera window associated
+with the submission. Text GLM and video MiMo run independently over those inputs;
+their canonical observations meet only in deterministic fusion. While the reply
+task is active, continuous-video events may drive motion but their expression index
+is suppressed so the turn-fused expression remains authoritative.
+
 The Idle motion remains active where supported because it drives crying/sleepy loop parameters.
 
 ---

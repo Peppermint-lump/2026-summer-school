@@ -313,6 +313,14 @@ an additional independent modality. A deterministic, bounded mapping may use a
 high-confidence action as weak video-emotion evidence; semantic actions such as
 head shaking must not be treated as proof of a negative internal state.
 
+A text-only submission must retain truthful zero-duration speech timing and attach
+a separate recent visual alignment window (three seconds by default). The GLM
+text observer and MiMo video observer analyze their independent inputs in the same
+turn, after which deterministic fusion produces the authoritative emotion,
+strategy, expression, and conflict result. A continuous-video result must not be
+reused merely because it is the latest result when its captured window does not
+match the text submission.
+
 ---
 
 ## 10. Canonical label space
@@ -563,12 +571,15 @@ The Windows MVP is accepted when:
 10. a high-confidence non-still action without an authored motion can produce one
     neutral `observe` fallback
     without inventing action semantics or triggering speech;
-11. low-quality video does not cause strong conflict;
-12. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
-13. provider failure degrades to ordinary conversation;
-14. temporary media is removed by default;
-15. secrets are not present in the repository or renderer;
-16. the app exits without leaving backend processes running.
+11. a typed turn can fuse its text observation with an independently analyzed
+    recent visual window, while continuous video cannot overwrite its fused
+    expression during the active reply;
+12. low-quality video does not cause strong conflict;
+13. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
+14. provider failure degrades to ordinary conversation;
+15. temporary media is removed by default;
+16. secrets are not present in the repository or renderer;
+17. the app exits without leaving backend processes running.
 
 ---
 

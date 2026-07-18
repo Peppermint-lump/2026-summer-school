@@ -9,13 +9,18 @@ from pathlib import Path
 from apps.backend.app.avatar.state_mapper import AvatarStateMapper
 from apps.backend.app.debug.trace_store import DebugTraceStore
 from apps.backend.app.fusion.service import EmotionFusionService
-from apps.backend.app.integration.loopback_server import LoopbackEmotionServer
+from apps.backend.app.integration.loopback_server import (
+    LoopbackEmotionServer,
+    _companion_context,
+)
 from packages.schemas import (
+    ActionType,
     EmotionLabel,
     EmotionStatus,
     EmotionTurnAnalysis,
     EmotionTurnResult,
     ModalityEmotion,
+    ObservedAction,
     TurnRecord,
 )
 
@@ -60,6 +65,53 @@ class FakeRuntime:
 
 
 class LoopbackTraceTests(unittest.TestCase):
+    def test_companion_context_contains_fusion_and_bounded_visual_evidence(
+        self,
+    ) -> None:
+        observations = (
+            ModalityEmotion.text_result(
+                label=EmotionLabel.POSITIVE,
+                confidence=0.9,
+                quality=0.9,
+                status=EmotionStatus.OK,
+            ),
+            ModalityEmotion.audio_result(
+                label=EmotionLabel.UNCERTAIN,
+                confidence=0.0,
+                quality=0.0,
+                status=EmotionStatus.INSUFFICIENT_EVIDENCE,
+            ),
+            ModalityEmotion.video_result(
+                label=EmotionLabel.NEUTRAL,
+                confidence=0.8,
+                quality=0.9,
+                status=EmotionStatus.OK,
+                fine_emotion="平静",
+                observed_actions=(
+                    ObservedAction(
+                        ActionType.POINT,
+                        0.8,
+                        "[visible] pointing to the left",
+                    ),
+                ),
+            ),
+        )
+        analysis = EmotionTurnAnalysis(
+            observations=observations,
+            fusion=EmotionFusionService().fuse(observations),
+        )
+        result = EmotionTurnResult(
+            analysis=analysis,
+            avatar_state=AvatarStateMapper().map(analysis),
+        )
+
+        context = _companion_context(result)
+
+        self.assertIn("point(confidence=0.80", context)
+        self.assertIn("evidence=(visible) pointing to the left", context)
+        self.assertIn("Deterministic fusion: label=", context)
+        self.assertIn("Authoritative strategy:", context)
+
     def test_every_canonical_stage_is_written_without_transcript(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -77,6 +129,8 @@ class LoopbackTraceTests(unittest.TestCase):
                     "turn_id": "turn_1",
                     "speech_start_ms": 1,
                     "speech_end_ms": 2,
+                    "visual_start_ms": 0,
+                    "visual_end_ms": 2,
                     "transcript": "private transcript sentinel",
                     "audio_wav_base64": None,
                 }
@@ -98,6 +152,9 @@ class LoopbackTraceTests(unittest.TestCase):
             )
             request_text = (trace_directory / "00_request.json").read_text()
             self.assertNotIn("private transcript sentinel", request_text)
+            request = json.loads(request_text)
+            self.assertTrue(request["visual_window_provided"])
+            self.assertEqual(request["visual_window_duration_ms"], 2)
             avatar = json.loads((trace_directory / "05_avatar_state.json").read_text())
             self.assertEqual(avatar["expression"], "heart")
             self.assertEqual(result["analysis"]["fusion"]["fused_label"], "uncertain")

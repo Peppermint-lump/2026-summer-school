@@ -12,6 +12,7 @@ from packages.schemas import (
     ConflictType,
     EmotionLabel,
     EmotionStatus,
+    Modality,
     ModalityEmotion,
     TurnRecord,
 )
@@ -41,9 +42,7 @@ class FakeVideoMiddleware:
 
 
 class FakeAudioService:
-    async def analyze(
-        self, *, turn_id: str, audio_path: object
-    ) -> ModalityEmotion:
+    async def analyze(self, *, turn_id: str, audio_path: object) -> ModalityEmotion:
         assert turn_id == "turn_1"
         assert audio_path is None
         return ModalityEmotion.audio_result(
@@ -55,6 +54,50 @@ class FakeAudioService:
 
 
 class EmotionMiddlewareTests(unittest.IsolatedAsyncioTestCase):
+    async def test_typed_text_and_visual_observations_fuse_without_audio(self) -> None:
+        class MissingAudioService:
+            async def analyze(
+                self, *, turn_id: str, audio_path: object
+            ) -> ModalityEmotion:
+                self_test.assertEqual(turn_id, "turn_1")
+                self_test.assertIsNone(audio_path)
+                return ModalityEmotion.audio_result(
+                    label=EmotionLabel.UNCERTAIN,
+                    confidence=0.0,
+                    quality=0.0,
+                    status=EmotionStatus.INSUFFICIENT_EVIDENCE,
+                )
+
+        self_test = self
+        middleware = EmotionMiddleware(  # type: ignore[arg-type]
+            FakeTextService(),
+            MissingAudioService(),  # type: ignore[arg-type]
+            FakeVideoMiddleware(),
+            EmotionFusionService(),
+            AvatarStateMapper(),
+        )
+
+        result = await middleware.analyze_turn(
+            TurnRecord(
+                session_id="session_1",
+                turn_id="turn_1",
+                speech_start_ms=300,
+                speech_end_ms=300,
+                visual_start_ms=100,
+                visual_end_ms=300,
+                transcript="我很好",
+            )
+        )
+
+        self.assertEqual(
+            result.analysis.fusion.reliable_modalities,
+            (Modality.TEXT, Modality.VIDEO),
+        )
+        self.assertEqual(
+            result.analysis.fusion.conflict_type,
+            ConflictType.VERBAL_POSITIVE_BEHAVIOR_NEGATIVE,
+        )
+
     async def test_independent_results_are_fused_after_both_complete(self) -> None:
         middleware = EmotionMiddleware(  # type: ignore[arg-type]
             FakeTextService(),

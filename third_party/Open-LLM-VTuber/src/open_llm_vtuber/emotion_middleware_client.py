@@ -37,11 +37,15 @@ class EmotionMiddlewareClient:
         token: str,
         timeout_seconds: float = 35.0,
         sample_rate: int = 16000,
+        text_visual_window_seconds: float = 3.0,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._token = token
         self._timeout_seconds = timeout_seconds
         self._sample_rate = sample_rate
+        if text_visual_window_seconds <= 0:
+            raise ValueError("text visual window must be positive")
+        self._text_visual_window_seconds = text_visual_window_seconds
 
     @classmethod
     def from_environment(cls) -> Optional["EmotionMiddlewareClient"]:
@@ -51,11 +55,13 @@ class EmotionMiddlewareClient:
             return None
         timeout = float(os.environ.get("EMOTION_BACKEND_TIMEOUT_SECONDS", "35"))
         sample_rate = int(os.environ.get("EMOTION_AUDIO_SAMPLE_RATE", "16000"))
+        text_visual_window = float(os.environ.get("TEXT_VISUAL_WINDOW_SECONDS", "3"))
         return cls(
             base_url=base_url,
             token=token,
             timeout_seconds=timeout,
             sample_rate=sample_rate,
+            text_visual_window_seconds=text_visual_window,
         )
 
     async def analyze(
@@ -69,11 +75,18 @@ class EmotionMiddlewareClient:
         audio_wav = _encode_audio_wav(raw_audio, self._sample_rate)
         end_ms = time.time_ns() // 1_000_000
         duration_ms = _audio_duration_ms(raw_audio, self._sample_rate)
+        speech_start_ms, visual_start_ms = _turn_start_times(
+            end_ms=end_ms,
+            audio_duration_ms=duration_ms,
+            text_visual_window_seconds=self._text_visual_window_seconds,
+        )
         payload = {
             "session_id": _safe_session_id(session_id),
             "turn_id": turn_id,
-            "speech_start_ms": max(0, end_ms - duration_ms),
+            "speech_start_ms": speech_start_ms,
             "speech_end_ms": end_ms,
+            "visual_start_ms": visual_start_ms,
+            "visual_end_ms": end_ms,
             "transcript": transcript,
             "audio_wav_base64": (
                 base64.b64encode(audio_wav).decode("ascii") if audio_wav else None
@@ -143,6 +156,20 @@ def _audio_duration_ms(raw_audio: Optional[np.ndarray], sample_rate: int) -> int
     return round(raw_audio.size / sample_rate * 1000)
 
 
+def _turn_start_times(
+    *,
+    end_ms: int,
+    audio_duration_ms: int,
+    text_visual_window_seconds: float,
+) -> tuple[int, int]:
+    """Keep true speech timing while aligning text turns to recent camera frames."""
+    speech_start_ms = max(0, end_ms - audio_duration_ms)
+    if audio_duration_ms > 0:
+        return speech_start_ms, speech_start_ms
+    visual_window_ms = round(text_visual_window_seconds * 1000)
+    return speech_start_ms, max(0, end_ms - visual_window_ms)
+
+
 def _safe_session_id(value: str) -> str:
     normalized = "".join(char for char in value if char.isalnum() or char in "_-")
     return normalized[:96] or "vtuber_session"
@@ -199,3 +226,21 @@ def apply_emotion_context(
     if not isinstance(context, str) or not context:
         return input_text
     return f"{input_text}\n\n{context}"
+
+
+def canonical_visual_observation_available(payload: Any) -> bool:
+    """Return whether the canonical middleware observed video for this turn."""
+    if not isinstance(payload, dict):
+        return False
+    analysis = payload.get("analysis")
+    if not isinstance(analysis, dict):
+        return False
+    observations = analysis.get("observations")
+    if not isinstance(observations, list):
+        return False
+    return any(
+        isinstance(observation, dict)
+        and observation.get("modality") == "video"
+        and observation.get("status") in {"ok", "uncertain"}
+        for observation in observations
+    )

@@ -58,6 +58,19 @@ class CompanionInputSafetyTests(unittest.TestCase):
         self.assertIs(safe_metadata, metadata)
         self.assertEqual(discarded_count, 0)
 
+    def test_guardrail_is_omitted_after_canonical_video_observation(self) -> None:
+        input_text = "你能看见我吗？"
+
+        guarded = add_visual_unavailable_context(
+            input_text,
+            {
+                "raw_images_discarded": True,
+                "canonical_visual_observation_available": True,
+            },
+        )
+
+        self.assertEqual(guarded, input_text)
+
 
 if __name__ == "__main__":
     unittest.main()

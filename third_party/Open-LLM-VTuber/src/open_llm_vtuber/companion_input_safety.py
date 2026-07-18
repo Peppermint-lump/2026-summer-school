@@ -30,6 +30,10 @@ def add_visual_unavailable_context(
     metadata: Optional[Dict[str, Any]],
 ) -> str:
     """Add a non-user-visible guardrail after ASR and before the agent call."""
-    if not metadata or not metadata.get("raw_images_discarded"):
+    if (
+        not metadata
+        or not metadata.get("raw_images_discarded")
+        or metadata.get("canonical_visual_observation_available") is True
+    ):
         return input_text
     return f"{input_text}\n\n{RAW_VISUAL_INPUT_NOTICE}"

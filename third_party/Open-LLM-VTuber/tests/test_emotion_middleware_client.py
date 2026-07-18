@@ -11,11 +11,61 @@ from src.open_llm_vtuber.emotion_middleware_client import (
     _encode_audio_wav,
     _parse_result,
     _parse_visual_update,
+    _turn_start_times,
     apply_emotion_context,
+    canonical_visual_observation_available,
 )
 
 
 class EmotionMiddlewareClientTests(unittest.TestCase):
+    def test_canonical_video_availability_requires_observed_video(self) -> None:
+        self.assertTrue(
+            canonical_visual_observation_available(
+                {
+                    "analysis": {
+                        "observations": [
+                            {"modality": "text", "status": "ok"},
+                            {"modality": "video", "status": "ok"},
+                        ]
+                    }
+                }
+            )
+        )
+        self.assertFalse(
+            canonical_visual_observation_available(
+                {
+                    "analysis": {
+                        "observations": [
+                            {
+                                "modality": "video",
+                                "status": "insufficient_evidence",
+                            }
+                        ]
+                    }
+                }
+            )
+        )
+
+    def test_typed_turn_uses_recent_visual_window_without_fake_speech(self) -> None:
+        self.assertEqual(
+            _turn_start_times(
+                end_ms=10_000,
+                audio_duration_ms=0,
+                text_visual_window_seconds=3,
+            ),
+            (10_000, 7_000),
+        )
+
+    def test_audio_turn_aligns_visual_window_to_real_speech(self) -> None:
+        self.assertEqual(
+            _turn_start_times(
+                end_ms=10_000,
+                audio_duration_ms=1_500,
+                text_visual_window_seconds=3,
+            ),
+            (8_500, 8_500),
+        )
+
     def test_raw_float_audio_is_encoded_as_mono_pcm16_wav(self) -> None:
         samples = np.array([-1.0, -0.25, 0.25, 1.0], dtype=np.float32)
         encoded = _encode_audio_wav(samples, 16000)

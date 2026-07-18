@@ -78,6 +78,8 @@ class TurnRecord:
     video_path: Path | None = None
     frame_paths: tuple[Path, ...] = ()
     transcript: str | None = None
+    visual_start_ms: int | None = None
+    visual_end_ms: int | None = None
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -87,6 +89,11 @@ class TurnRecord:
             raise ValueError("session_id and turn_id must be non-empty")
         if self.speech_start_ms < 0 or self.speech_end_ms < self.speech_start_ms:
             raise ValueError("invalid speech time range")
+        if (self.visual_start_ms is None) is not (self.visual_end_ms is None):
+            raise ValueError("visual time range must provide both bounds")
+        if self.visual_start_ms is not None and self.visual_end_ms is not None:
+            if self.visual_start_ms < 0 or self.visual_end_ms < self.visual_start_ms:
+                raise ValueError("invalid visual time range")
 
 
 @dataclass(frozen=True, slots=True)

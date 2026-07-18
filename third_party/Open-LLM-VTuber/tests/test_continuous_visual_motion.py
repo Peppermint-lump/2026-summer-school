@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import unittest
 
-from src.open_llm_vtuber.websocket_handler import _cooldown_motion
+from src.open_llm_vtuber.websocket_handler import (
+    _cooldown_motion,
+    _visual_expression_index,
+)
 
 
 class ContinuousVisualMotionTests(unittest.TestCase):
+    def test_active_conversation_suppresses_only_visual_expression(self) -> None:
+        self.assertIsNone(_visual_expression_index([5], conversation_active=True))
+        self.assertEqual(
+            _visual_expression_index([5], conversation_active=False),
+            5,
+        )
+
     def test_repeated_greeting_is_suppressed_during_cooldown(self) -> None:
         motion, previous, emitted = _cooldown_motion(
             "greeting",

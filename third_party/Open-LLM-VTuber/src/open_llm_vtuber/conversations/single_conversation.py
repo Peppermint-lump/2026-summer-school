@@ -20,6 +20,7 @@ from ..service_context import ServiceContext
 from ..emotion_middleware_client import (
     EmotionMiddlewareClient,
     EmotionMiddlewareResult,
+    canonical_visual_observation_available,
 )
 
 # Import necessary types from agent outputs
@@ -82,6 +83,9 @@ async def process_single_conversation(
             )[:1]
             metadata = dict(metadata or {})
             metadata["emotion_companion_context"] = emotion_result.companion_context
+            metadata["canonical_visual_observation_available"] = (
+                canonical_visual_observation_available(emotion_result.payload)
+            )
             metadata["authoritative_expression"] = emotion_result.expression
             metadata["authoritative_motion"] = emotion_result.motion
             logger.info(

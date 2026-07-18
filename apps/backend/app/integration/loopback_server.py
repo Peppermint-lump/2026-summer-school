@@ -120,8 +120,10 @@ class LoopbackEmotionServer:
                     {
                         "session_id": "continuous_visual",
                         "turn_id": turn_id,
-                        "speech_start_ms": max(0, end_ms - window_ms),
+                        "speech_start_ms": end_ms,
                         "speech_end_ms": end_ms,
+                        "visual_start_ms": max(0, end_ms - window_ms),
+                        "visual_end_ms": end_ms,
                         "transcript": None,
                         "audio_wav_base64": None,
                     }
@@ -171,6 +173,16 @@ class LoopbackEmotionServer:
         speech_end_ms = _required_nonnegative_int(payload, "speech_end_ms")
         if speech_end_ms < speech_start_ms:
             raise ValueError("speech_end_ms must be greater than speech_start_ms")
+        visual_start_ms = _optional_nonnegative_int(payload, "visual_start_ms")
+        visual_end_ms = _optional_nonnegative_int(payload, "visual_end_ms")
+        if (visual_start_ms is None) is not (visual_end_ms is None):
+            raise ValueError("visual time range must provide both bounds")
+        if (
+            visual_start_ms is not None
+            and visual_end_ms is not None
+            and visual_end_ms < visual_start_ms
+        ):
+            raise ValueError("visual_end_ms must be greater than visual_start_ms")
         transcript_value = payload.get("transcript")
         if transcript_value is not None and not isinstance(transcript_value, str):
             raise ValueError("transcript must be a string or null")
@@ -181,6 +193,8 @@ class LoopbackEmotionServer:
             turn_id=turn_id,
             speech_start_ms=speech_start_ms,
             speech_end_ms=speech_end_ms,
+            visual_start_ms=visual_start_ms,
+            visual_end_ms=visual_end_ms,
             audio_path=audio_path,
             transcript=transcript,
         )
@@ -196,6 +210,12 @@ class LoopbackEmotionServer:
                 "transcript_character_count": len(transcript or ""),
                 "audio_provided": audio_path is not None,
                 "camera_enabled": self._runtime.camera_enabled,
+                "visual_window_provided": visual_start_ms is not None,
+                "visual_window_duration_ms": (
+                    visual_end_ms - visual_start_ms
+                    if visual_start_ms is not None and visual_end_ms is not None
+                    else speech_end_ms - speech_start_ms
+                ),
                 "raw_media_logged": False,
             },
         )
@@ -353,6 +373,15 @@ def _required_nonnegative_int(payload: dict[str, Any], key: str) -> int:
     return value
 
 
+def _optional_nonnegative_int(payload: dict[str, Any], key: str) -> int | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{key} must be a non-negative integer or null")
+    return cast(int, value)
+
+
 def _result_payload(result: EmotionTurnResult) -> dict[str, Any]:
     return cast(dict[str, Any], _jsonable(result))
 
@@ -373,23 +402,41 @@ def _jsonable(value: Any) -> Any:
 
 def _companion_context(result: EmotionTurnResult) -> str:
     observations: list[str] = []
-    action_names: list[str] = []
+    visible_details: list[str] = []
     for observation in result.analysis.observations:
+        fine_emotion = (
+            f",fine={_context_fragment(observation.fine_emotion)}"
+            if observation.fine_emotion
+            else ""
+        )
         observations.append(
             f"{observation.modality.value}={observation.label.value}"
             f"(reliability={observation.reliability:.2f},"
-            f"status={observation.status.value})"
+            f"status={observation.status.value}{fine_emotion})"
         )
         if observation.modality is Modality.VIDEO:
-            action_names.extend(
-                action.action.value for action in observation.observed_actions
+            visible_details.extend(
+                f"{action.action.value}(confidence={action.confidence:.2f},"
+                f"evidence={_context_fragment(action.evidence) or 'none'})"
+                for action in observation.observed_actions
             )
-    actions = ",".join(action_names) if action_names else "none"
+    visible = "; ".join(visible_details) if visible_details else "none"
+    fusion = result.analysis.fusion
     return (
         "[System context: Independent emotion observers produced uncertain signals, "
         "not facts about the user's internal state. "
         f"Observations: {'; '.join(observations)}. "
-        f"Visible actions: {actions}. "
-        f"Authoritative strategy: {result.analysis.fusion.strategy.value}. "
+        f"Visible actions: {visible}. "
+        f"Deterministic fusion: label={fusion.fused_label.value}, "
+        f"weighted_score={fusion.weighted_score:.2f}, "
+        f"conflict={fusion.conflict_type.value}. "
+        f"Authoritative strategy: {fusion.strategy.value}. "
         "Use nonjudgmental language, do not diagnose or claim certainty.]"
     )
+
+
+def _context_fragment(value: str | None) -> str:
+    if not value:
+        return ""
+    normalized = " ".join(value.split())
+    return normalized.replace("[", "(").replace("]", ")")[:160]

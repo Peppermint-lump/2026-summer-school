@@ -27,6 +27,10 @@ ModalityEmotion(text/audio/video) -> fusion -> companion -> avatar
 - 所有 `*_ms` 都是 Unix epoch 毫秒整数。
 - `speech_start_ms` 与 `speech_end_ms` 为闭区间。
 - `speech_end_ms >= speech_start_ms`。
+- `visual_start_ms / visual_end_ms` 为可选且必须成对出现的视觉对齐闭区间；未提供
+  时回退到 speech 区间；
+- 纯文字提交保持 `speech_start_ms == speech_end_ms`，同时默认提供提交前 3 秒的
+  visual 区间，禁止伪造一段 speech 时长；
 - 摄像头帧必须在采集时立即附加同一时钟来源的时间戳。
 - 说话轮次只能请求当前 `turn_id` 的时间范围，视频侧不得跨 turn 混用帧。
 - 独立视觉观察使用 `visual_<unix_ms>` 标识和最近 3 秒的有序帧窗口，绝不附带
@@ -43,6 +47,8 @@ ModalityEmotion(text/audio/video) -> fusion -> companion -> avatar
 | `turn_id` | 非空字符串 | integration | 当前发言轮次标识 |
 | `speech_start_ms` | 整数 | integration | 用户发言开始 |
 | `speech_end_ms` | 整数 | integration | 用户发言结束 |
+| `visual_start_ms` | 可选整数 | integration | 与本轮输入关联的视觉窗口开始 |
+| `visual_end_ms` | 可选整数 | integration | 与本轮输入关联的视觉窗口结束 |
 
 媒体路径与 `transcript` 可为空。路径只在进程内部传递，不进入日志和用户回复。
 
@@ -119,6 +125,10 @@ ModalityEmotion(text/audio/video) -> fusion -> companion -> avatar
   连续事件采用边沿触发，必须先观察到非该事件才允许再次执行；
 - 说话期间后台观察器仍工作，因此明确动作可以即时驱动 Live2D；说话结束后，
   原有按轮次三模态分析独立完成加权和最终表情；
+- 文字提交时，文字 GLM 与最近 3 秒窗口的视频 MiMo 在同一 turn 中并行分析；
+  两个规范观察进入确定性融合，而不是把图片或视觉 Prompt 交给 GLM；
+- 对话任务存续期间，连续视觉仍可下发 motion，但其 expression index 被抑制，
+  防止单模态视觉表情覆盖本轮融合表情；
 - 视觉事件只驱动动作/表情，不触发聊天模型、TTS 或主动语言回复。
 
 ## 7. 集成验收示例

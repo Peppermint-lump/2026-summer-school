@@ -125,3 +125,7 @@ runtime/debug/emotion_pipeline/
   当任一非静止动作置信度不低于 `0.60`、且没有专属 Live2D 动作时，调试页的
   `角色动作` 会显示 `observe`，角色执行一次左右观察后回到 Idle。连续相同事件
   不会重复触发。
+- 文字提交对应的 `00_request.json` 应显示 `visual_window_provided=true` 和
+  `visual_window_duration_ms=3000`；随后 `01_text_observation.json` 与
+  `03_video_observation.json` 使用同一 turn ID，`04_fusion.json` 至少在两路可靠时
+  列出 text、video 两个 `reliable_modalities`。

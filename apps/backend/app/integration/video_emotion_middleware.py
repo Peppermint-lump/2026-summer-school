@@ -47,10 +47,20 @@ class VideoEmotionMiddleware:
 
         try:
             try:
+                start_ms = (
+                    turn.visual_start_ms
+                    if turn.visual_start_ms is not None
+                    else turn.speech_start_ms
+                )
+                end_ms = (
+                    turn.visual_end_ms
+                    if turn.visual_end_ms is not None
+                    else turn.speech_end_ms
+                )
                 artifact = self._preprocessor.prepare(
                     turn.turn_id,
-                    turn.speech_start_ms,
-                    turn.speech_end_ms,
+                    start_ms,
+                    end_ms,
                 )
             except (FrameEncodingError, OSError):
                 logger.warning(
@@ -70,9 +80,7 @@ class VideoEmotionMiddleware:
                 except OSError:
                     logger.warning(
                         "Temporary turn media cleanup failed",
-                        extra=_log_context(
-                            turn, stage="media_cleanup", status="error"
-                        ),
+                        extra=_log_context(turn, stage="media_cleanup", status="error"),
                     )
 
 

@@ -79,6 +79,16 @@ EmotionTurnResult
 
 Provider 原始响应、base64、媒体路径和 API key 不得进入该返回对象。
 
+纯文字 turn 使用独立的 `visual_start_ms / visual_end_ms`（默认提交前 3 秒）。
+`TextEmotionService` 与 `VideoEmotionMiddleware` 仍在 `asyncio.gather` 中分别调用
+GLM 和 MiMo，结果只在 `EmotionFusionService` 汇合。若视频质量不足、关闭或超时，
+文字回复按 fail-open 规则继续，不能用连续视觉缓存伪造本轮可靠视频证据。
+
+陪伴 GLM 接收的规范摘要包含：各模态 label/reliability/status、视频 fine emotion、
+标准动作名及截断后的可见证据、融合 label/weighted score/conflict/strategy。摘要不
+包含 transcript 副本、帧、base64、路径或 Provider 原始响应；其中视觉描述仍是
+不确定观察，不能作为用户内心状态的事实。
+
 ## 5. Live2D 运行接入
 
 `AvatarState.expression` 是角色表情的权威输入，GLM 回复中的自由表情标签
@@ -87,6 +97,10 @@ Provider 原始响应、base64、媒体路径和 API key 不得进入该返回�
 对应的 `greeting`/`observe` motion 发给动作控制器。`observe` 仅执行短暂左右
 观察并恢复 Idle，不产生台词。陪伴 GLM 只接收规范观察摘要与策略，
 不接收原始媒体。
+
+当对话任务处于 active 状态，连续视觉的 avatar-state 仍携带 motion，但
+`expression_index=null` 且 `expression_suppressed=true`。本轮融合产生的权威表情
+因此可以覆盖整个回复/TTS 生命周期；任务结束后连续视觉恢复表情控制。
 
 每轮元数据调试输出位于：
 

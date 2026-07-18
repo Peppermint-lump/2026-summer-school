@@ -27,6 +27,29 @@ class SchemaTests(unittest.TestCase):
                 speech_end_ms=100,
             )
 
+    def test_turn_record_accepts_an_independent_visual_alignment_window(self) -> None:
+        turn = TurnRecord(
+            session_id="session_1",
+            turn_id="turn_1",
+            speech_start_ms=500,
+            speech_end_ms=500,
+            visual_start_ms=200,
+            visual_end_ms=500,
+            transcript="typed input",
+        )
+
+        self.assertEqual((turn.visual_start_ms, turn.visual_end_ms), (200, 500))
+
+    def test_turn_record_rejects_partial_visual_time_range(self) -> None:
+        with self.assertRaises(ValueError):
+            TurnRecord(
+                session_id="session_1",
+                turn_id="turn_1",
+                speech_start_ms=500,
+                speech_end_ms=500,
+                visual_start_ms=200,
+            )
+
     def test_video_result_computes_deterministic_reliability(self) -> None:
         result = ModalityEmotion.video_result(
             label=EmotionLabel.NEGATIVE,

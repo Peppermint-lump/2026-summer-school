@@ -47,6 +47,47 @@ class FileCheckingProvider:
 
 
 class VideoEmotionMiddlewareTests(unittest.IsolatedAsyncioTestCase):
+    async def test_text_turn_uses_visual_window_instead_of_zero_length_speech(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_root = Path(temporary)
+            camera = CameraBuffer()
+            grid = np.indices((100, 100)).sum(axis=0) % 2
+            image = np.repeat(
+                ((grid * 160 + 40).astype(np.uint8))[:, :, None],
+                3,
+                2,
+            )
+            for timestamp in (100, 200, 300):
+                camera.append_frame(timestamp, image)
+            middleware = VideoEmotionMiddleware(
+                VideoTurnPreprocessor(
+                    camera,
+                    FaceQualityEvaluator(SingleFaceDetector()),
+                    FrameExporter(runtime_root),
+                ),
+                VideoEmotionService(
+                    FileCheckingProvider(),
+                    VideoEmotionServiceConfig(enabled=True),
+                ),
+                TurnMediaCleaner(runtime_root),
+                camera_enabled=True,
+            )
+            turn = TurnRecord(
+                session_id="session_1",
+                turn_id="turn_text",
+                speech_start_ms=300,
+                speech_end_ms=300,
+                visual_start_ms=100,
+                visual_end_ms=300,
+                transcript="typed input",
+            )
+
+            result = await middleware.analyze_turn(turn)
+
+            self.assertEqual(result.status, EmotionStatus.OK)
+
     async def test_turn_media_is_removed_after_successful_analysis(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             runtime_root = Path(temporary)
