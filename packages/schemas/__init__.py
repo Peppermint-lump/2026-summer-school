@@ -1,7 +1,15 @@
 """Versioned canonical domain schemas."""
 
+from .avatar import (
+    AvatarEmotion,
+    AvatarExpression,
+    AvatarMotion,
+    AvatarState,
+    ModalityExpression,
+)
 from .config import (
     AppConfig,
+    AudioAnalysisConfig,
     CameraCaptureConfig,
     FusionConfig,
     TextAnalysisConfig,
@@ -24,10 +32,16 @@ from .fusion import (
     ConflictType,
     EmotionTurnAnalysis,
 )
+from .result import EmotionTurnResult
 
 __all__ = [
     "AppConfig",
     "ActionType",
+    "AudioAnalysisConfig",
+    "AvatarEmotion",
+    "AvatarExpression",
+    "AvatarMotion",
+    "AvatarState",
     "CameraCaptureConfig",
     "CompanionStrategy",
     "ConflictResult",
@@ -35,9 +49,11 @@ __all__ = [
     "EmotionLabel",
     "EmotionStatus",
     "EmotionTurnAnalysis",
+    "EmotionTurnResult",
     "FusionConfig",
     "Modality",
     "ModalityEmotion",
+    "ModalityExpression",
     "ObservedAction",
     "TextAnalysisConfig",
     "TurnRecord",

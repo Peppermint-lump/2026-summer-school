@@ -66,6 +66,26 @@ possible.
 - Regression test: `tests/test_companion_input_safety.py` verifies discard,
   metadata preservation, and text-only fallback context.
 
+### Canonical three-modality middleware adapter
+
+- Reason: the upstream conversation path previously sent microphone audio only to
+  ASR and let the companion GLM choose expressions. The project contract requires
+  independent GLM text observation, MiMo raw-audio observation, MiMo ordered-frame
+  observation, deterministic fusion, and an authoritative Live2D state.
+- Upstream files and functions:
+  `src/open_llm_vtuber/emotion_middleware_client.py`;
+  `conversations/single_conversation.py::process_single_conversation`;
+  `conversations/conversation_utils.py::create_batch_input`;
+  `frontend/avatar-state-bridge.js`; `frontend/index.html`.
+- Expected behavior: after ASR, the adapter sends transcript and raw WAV in separate
+  request fields to the authenticated loopback application boundary. The canonical
+  backend keeps them isolated at provider calls, returns a normalized observation
+  summary plus authoritative expression/motion, and fails open when unavailable.
+  Raw media is never sent to GLM and is deleted after the three analysis tasks end.
+- Regression validation: adapter payload/PCM tests, loopback authentication tests,
+  middleware lifecycle tests, and a live microphone turn with metadata traces under
+  `runtime/debug/emotion_turns/`.
+
 ### Cached service-context log redaction
 
 - Reason: verbose startup expanded the complete environment-substituted character

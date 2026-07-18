@@ -1,4 +1,4 @@
-"""Provider-independent ports for video-only emotion observation."""
+"""Provider-independent ports for isolated emotion observations."""
 
 from __future__ import annotations
 
@@ -39,6 +39,26 @@ class VideoEmotionRequest:
 
 class VideoEmotionProvider(Protocol):
     async def analyze_video(self, request: VideoEmotionRequest) -> ModalityEmotion: ...
+
+
+@dataclass(frozen=True, slots=True)
+class AudioEmotionRequest:
+    turn_id: str
+    audio_path: Path
+    quality: float
+    prompt_version: str
+
+    def __post_init__(self) -> None:
+        if not self.turn_id or not self.audio_path:
+            raise ValueError("audio emotion requests require a turn and audio")
+        if not 0.0 <= self.quality <= 1.0:
+            raise ValueError("quality must be between 0 and 1")
+        if not self.prompt_version:
+            raise ValueError("prompt_version must be non-empty")
+
+
+class AudioEmotionProvider(Protocol):
+    async def analyze_audio(self, request: AudioEmotionRequest) -> ModalityEmotion: ...
 
 
 @dataclass(frozen=True, slots=True)

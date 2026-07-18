@@ -5,8 +5,13 @@ from __future__ import annotations
 import argparse
 import os
 import runpy
+import secrets
 import shutil
+import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable, MutableMapping
 from pathlib import Path
 from typing import Any, cast
@@ -43,6 +48,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="validate .env and prepare conf.yaml without starting the server",
     )
+    parser.add_argument("--emotion-port", type=int, default=18765)
     return parser.parse_args()
 
 
@@ -123,8 +129,69 @@ def _mapping(parent: dict[str, Any], key: str) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _root_python() -> Path:
+    candidates = (
+        REPOSITORY_ROOT / ".venv" / "bin" / "python",
+        REPOSITORY_ROOT / ".venv" / "Scripts" / "python.exe",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise VtuberConfigurationError(
+        "root .venv Python is missing; create the project environment first"
+    )
+
+
+def start_emotion_backend(port: int) -> subprocess.Popen[bytes]:
+    """Start the Python 3.11+ canonical middleware before the upstream server."""
+    token = secrets.token_urlsafe(32)
+    os.environ["EMOTION_BACKEND_TOKEN"] = token
+    os.environ["EMOTION_BACKEND_URL"] = f"http://127.0.0.1:{port}"
+    process = subprocess.Popen(
+        [
+            str(_root_python()),
+            str(REPOSITORY_ROOT / "scripts" / "start_emotion_backend.py"),
+            "--port",
+            str(port),
+        ],
+        cwd=REPOSITORY_ROOT,
+        env=os.environ.copy(),
+    )
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}/health",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    deadline = time.monotonic() + 15.0
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise VtuberConfigurationError(
+                f"emotion backend exited with code {process.returncode}"
+            )
+        try:
+            with urllib.request.urlopen(request, timeout=0.5) as response:
+                if response.status == 200:
+                    return process
+        except (urllib.error.URLError, TimeoutError):
+            time.sleep(0.1)
+    process.terminate()
+    process.wait(timeout=5)
+    raise VtuberConfigurationError("emotion backend startup timed out")
+
+
+def stop_emotion_backend(process: subprocess.Popen[bytes] | None) -> None:
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
 def main() -> int:
     args = parse_args()
+    emotion_backend: subprocess.Popen[bytes] | None = None
     try:
         load_project_environment(REPOSITORY_ROOT)
         prepare_vtuber_config(UPSTREAM_ROOT, os.environ)
@@ -135,13 +202,20 @@ def main() -> int:
         print("Open-LLM-VTuber environment configuration is valid")
         return 0
 
-    os.chdir(UPSTREAM_ROOT)
-    sys.path.insert(0, str(UPSTREAM_ROOT))
-    sys.argv = [str(UPSTREAM_ROOT / "run_server.py")]
-    if args.verbose:
-        sys.argv.append("--verbose")
-    runpy.run_path(str(UPSTREAM_ROOT / "run_server.py"), run_name="__main__")
-    return 0
+    try:
+        emotion_backend = start_emotion_backend(args.emotion_port)
+        os.chdir(UPSTREAM_ROOT)
+        sys.path.insert(0, str(UPSTREAM_ROOT))
+        sys.argv = [str(UPSTREAM_ROOT / "run_server.py")]
+        if args.verbose:
+            sys.argv.append("--verbose")
+        runpy.run_path(str(UPSTREAM_ROOT / "run_server.py"), run_name="__main__")
+        return 0
+    except VtuberConfigurationError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        stop_emotion_backend(emotion_backend)
 
 
 if __name__ == "__main__":

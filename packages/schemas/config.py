@@ -60,6 +60,35 @@ class VideoAnalysisConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class AudioAnalysisConfig:
+    enabled: bool = False
+    provider: str = "mimo"
+    model: str = "mimo-v2.5"
+    base_url: str = "https://api.xiaomimimo.com/v1"
+    api_key_secret_name: str = "MIMO_API_KEY"
+    timeout_seconds: float = 20.0
+    max_retries: int = 2
+    prompt_path: Path = Path("configs/prompts/audio_emotion_v1.txt")
+    prompt_version: str = "audio_emotion_v1"
+    minimum_quality: float = 0.35
+    max_media_bytes: int = 24 * 1024 * 1024
+
+    def __post_init__(self) -> None:
+        if self.provider != "mimo":
+            raise ValueError(
+                "only the configured MVP audio provider 'mimo' is supported"
+            )
+        if self.timeout_seconds <= 0 or self.max_retries < 0:
+            raise ValueError("invalid audio provider timeout or retry configuration")
+        if not 0.0 <= self.minimum_quality <= 1.0:
+            raise ValueError("audio minimum_quality must be between 0 and 1")
+        if self.max_media_bytes <= 0:
+            raise ValueError("audio max_media_bytes must be positive")
+        if not self.prompt_version or not self.api_key_secret_name:
+            raise ValueError("prompt version and secret name must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
 class TextAnalysisConfig:
     enabled: bool = False
     provider: str = "glm"
@@ -107,5 +136,6 @@ class FusionConfig:
 class AppConfig:
     camera: CameraCaptureConfig = CameraCaptureConfig()
     video_emotion: VideoAnalysisConfig = VideoAnalysisConfig()
+    audio_emotion: AudioAnalysisConfig = AudioAnalysisConfig()
     text_emotion: TextAnalysisConfig = TextAnalysisConfig()
     fusion: FusionConfig = FusionConfig()

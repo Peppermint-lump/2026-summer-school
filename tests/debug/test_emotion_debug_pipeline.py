@@ -156,7 +156,9 @@ class EmotionDebugPipelineTests(unittest.TestCase):
             )
             self.assertEqual(video["observed_actions"][0]["type"], "wave")
             self.assertEqual(result["fusion"]["final_emotion"], "positive")
-            self.assertEqual(result["audio"]["status"], "not_implemented")
+            self.assertEqual(
+                result["audio"]["status"], "not_provided_by_camera_preview"
+            )
             self.assertFalse(result["raw_media_retained"])
             self.assertEqual(cleaner.cleaned_turns, [result["turn_id"]])
             self.assertEqual(states[-1], "completed")

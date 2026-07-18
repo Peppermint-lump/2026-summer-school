@@ -11,6 +11,18 @@ capture:
     retain_media: false
 
 emotion:
+  audio:
+    enabled: false
+    provider: mimo
+    model: mimo-v2.5
+    base_url: "https://api.xiaomimimo.com/v1"
+    api_key_secret_name: MIMO_API_KEY
+    timeout_seconds: 20
+    max_retries: 2
+    prompt_path: configs/prompts/audio_emotion_v1.txt
+    prompt_version: audio_emotion_v1
+    minimum_quality: 0.35
+    max_media_bytes: 25165824
   video:
     enabled: false
     provider: mimo

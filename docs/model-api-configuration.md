@@ -26,17 +26,18 @@ logs, screenshots, or chat messages.
 | Responsibility | Provider/model environment | Credential | Status |
 | --- | --- | --- | --- |
 | Video-only emotion | `MIMO_MODEL=mimo-v2.5` | `MIMO_API_KEY` | Implemented |
-| Audio-only emotion | `MIMO_MODEL=mimo-v2.5` | `MIMO_API_KEY` | Contract defined; adapter pending |
+| Audio-only emotion | `MIMO_MODEL=mimo-v2.5` | `MIMO_API_KEY` | Implemented |
 | Audio/video fallback | `QWEN_MODEL=qwen3-omni-flash` | `QWEN_API_KEY` | Contract defined; adapter pending |
 | Text-only emotion | `GLM_TEXT_EMOTION_MODEL` | `GLM_API_KEY` | Implemented |
 | Companion response | `GLM_COMPANION_MODEL` | `GLM_API_KEY` | Open-LLM-VTuber connection configured |
-
-`TEXT_EMOTION_TIMEOUT_SECONDS` and `VIDEO_EMOTION_TIMEOUT_SECONDS` control the
-independent GLM and MiMo latency budgets. The example uses 30 seconds for remote
-debugging; either timeout still degrades to an uncertain modality observation and
-does not discard the other result.
 | Speech recognition | `ASR_MODEL=sherpa_onnx_asr` | None | Local |
 | Speech synthesis | `TTS_MODEL=piper_tts` | None | Local voice files still required |
+
+`TEXT_EMOTION_TIMEOUT_SECONDS`, `AUDIO_EMOTION_TIMEOUT_SECONDS`, and
+`VIDEO_EMOTION_TIMEOUT_SECONDS` control independent Provider latency budgets.
+`EMOTION_BACKEND_TIMEOUT_SECONDS` must be longer than the largest of those
+budgets so the VTuber adapter can receive the canonical fallback result. A
+Provider timeout degrades only that modality and does not discard the others.
 
 MiMo pay-as-you-go uses `https://api.xiaomimimo.com/v1`. MiMo Token Plan keys
 use the plan-specific endpoint shown in the MiMo console instead. Qwen endpoints
@@ -49,15 +50,21 @@ a product-contract change, not a local `.env` customization.
 The action mapping, reliability threshold, modality weights, and current live
 integration boundary are documented in `docs/action-text-emotion-fusion.md`.
 
-## Enable and test MiMo video emotion
+## Enable MiMo audio/video emotion
 
 Keep cloud analysis disabled while editing the file. After filling the MiMo key,
 set:
 
 ```dotenv
+CAMERA_ENABLED=false
 VIDEO_EMOTION_ENABLED=true
+AUDIO_EMOTION_ENABLED=true
 TEXT_EMOTION_ENABLED=true
 ```
+
+With `CAMERA_ENABLED=false`, MiMo video returns `disabled` without opening a
+device; microphone turns still send raw turn audio to MiMo audio after ASR, and
+the transcript independently goes to GLM text emotion.
 
 Then run one explicit paid smoke-test command:
 

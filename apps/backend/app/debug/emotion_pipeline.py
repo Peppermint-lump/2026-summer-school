@@ -180,7 +180,7 @@ class EmotionDebugPipeline:
             "text": _observation_payload(text_result),
             "fusion": fusion_payload,
             "audio": {
-                "status": "not_implemented",
+                "status": "not_provided_by_camera_preview",
                 "included_in_fusion": False,
             },
             "cleanup": cleanup_payload,

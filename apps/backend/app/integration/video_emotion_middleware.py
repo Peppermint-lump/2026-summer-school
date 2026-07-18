@@ -28,11 +28,13 @@ class VideoEmotionMiddleware:
         media_cleaner: TurnMediaCleaner,
         *,
         camera_enabled: bool,
+        cleanup_after_analysis: bool = True,
     ) -> None:
         self._preprocessor = preprocessor
         self._emotion_service = emotion_service
         self._media_cleaner = media_cleaner
         self._camera_enabled = camera_enabled
+        self._cleanup_after_analysis = cleanup_after_analysis
 
     async def analyze_turn(self, turn: TurnRecord) -> ModalityEmotion:
         if not self._camera_enabled:
@@ -62,13 +64,16 @@ class VideoEmotionMiddleware:
                 )
             return await self._emotion_service.analyze(artifact)
         finally:
-            try:
-                self._media_cleaner.cleanup_turn(turn.turn_id)
-            except OSError:
-                logger.warning(
-                    "Temporary turn media cleanup failed",
-                    extra=_log_context(turn, stage="media_cleanup", status="error"),
-                )
+            if self._cleanup_after_analysis:
+                try:
+                    self._media_cleaner.cleanup_turn(turn.turn_id)
+                except OSError:
+                    logger.warning(
+                        "Temporary turn media cleanup failed",
+                        extra=_log_context(
+                            turn, stage="media_cleanup", status="error"
+                        ),
+                    )
 
 
 def _log_context(turn: TurnRecord, *, stage: str, status: str) -> dict[str, object]:

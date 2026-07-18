@@ -7,11 +7,13 @@ One turn produces independent canonical observations:
 ```text
 ASR transcript only          -> GLM text emotion
 ordered silent video frames -> MiMo visual emotion + observed actions
-raw audio only              -> audio emotion adapter (pending)
+raw audio only              -> MiMo audio emotion
 ```
 
 The text provider never receives images, actions, audio, or another modality's
-result. The video provider never receives the transcript or audio result.
+result. The video provider never receives the transcript or audio result. The
+audio provider receives raw turn audio plus the audio-only prompt, never the
+transcript or visual observation.
 
 ## Action recognition
 
@@ -96,8 +98,10 @@ Implemented and offline-tested:
 - MiMo action parsing and normalization;
 - bounded action-to-video-emotion mapping;
 - GLM text-only emotion provider and timeout fallback;
+- MiMo raw-audio emotion provider, local WAV quality and timeout fallback;
 - deterministic fusion and conflict classification;
-- parallel text/video middleware;
+- parallel text/audio/video middleware;
+- per-modality expression suggestions and deterministic final AvatarState;
 - paid opt-in debug command;
 - camera preview中的按轮次云端分析、逐阶段状态和 metadata-only 调试目录。
 

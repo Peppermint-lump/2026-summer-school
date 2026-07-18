@@ -32,6 +32,16 @@ class SchemaTests(unittest.TestCase):
         )
         self.assertEqual(result.reliability, 0.6)
 
+    def test_audio_result_is_independent_and_computes_reliability(self) -> None:
+        result = ModalityEmotion.audio_result(
+            label=EmotionLabel.POSITIVE,
+            confidence=0.8,
+            quality=0.75,
+            status=EmotionStatus.OK,
+        )
+        self.assertEqual(result.modality, Modality.AUDIO)
+        self.assertEqual(result.reliability, 0.6)
+
     def test_modality_emotion_rejects_sensitive_metadata(self) -> None:
         with self.assertRaises(ValueError):
             ModalityEmotion.video_result(

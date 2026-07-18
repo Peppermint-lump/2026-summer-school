@@ -6,15 +6,18 @@ from pathlib import Path
 from typing import Any
 
 from apps.backend.app.emotion.providers.base import (
+    AudioEmotionRequest,
     ProviderInvalidOutputError,
     VideoEmotionRequest,
 )
 from apps.backend.app.emotion.providers.mimo import (
+    MiMoAudioConfig,
+    MiMoAudioEmotionProvider,
     MiMoVideoConfig,
     MiMoVideoEmotionProvider,
 )
 from apps.backend.app.infrastructure.http_client import HttpResponse
-from packages.schemas import ActionType, EmotionLabel, EmotionStatus
+from packages.schemas import ActionType, EmotionLabel, EmotionStatus, Modality
 
 
 class FakeHttpClient:
@@ -51,6 +54,46 @@ class MiMoProviderTests(unittest.IsolatedAsyncioTestCase):
         }
         values.update(changes)
         return MiMoVideoConfig(**values)
+
+    def audio_config(self, **changes: Any) -> MiMoAudioConfig:
+        values: dict[str, Any] = {
+            "base_url": "https://mimo.invalid/v1",
+            "api_key": "test-key-not-production",
+            "max_retries": 0,
+        }
+        values.update(changes)
+        return MiMoAudioConfig(**values)
+
+    async def test_audio_payload_contains_only_raw_audio_and_prompt(self) -> None:
+        client = FakeHttpClient(
+            [
+                response_with_content(
+                    '{"label":"positive","fine_emotion":"bright prosody",'
+                    '"confidence":0.8,"evidence":["rising energy"]}'
+                )
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            audio = Path(temporary) / "turn.wav"
+            audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVEfmt ")
+            provider = MiMoAudioEmotionProvider(
+                self.audio_config(), client, prompt="prosody only; ignore words"
+            )
+            result = await provider.analyze_audio(
+                AudioEmotionRequest(
+                    turn_id="turn_1",
+                    audio_path=audio,
+                    quality=0.75,
+                    prompt_version="audio_emotion_v1",
+                )
+            )
+
+        self.assertEqual(result.modality, Modality.AUDIO)
+        self.assertEqual(result.reliability, 0.6)
+        content = client.payloads[0]["messages"][0]["content"]
+        self.assertEqual(content[0]["type"], "input_audio")
+        self.assertIn("data:audio/wav;base64", content[0]["input_audio"]["data"])
+        self.assertNotIn("transcript", str(content).lower())
 
     async def test_normalizes_video_only_json(self) -> None:
         client = FakeHttpClient(

@@ -57,6 +57,21 @@ The default development endpoint is:
 http://127.0.0.1:12393
 ```
 
+The same launcher also starts the authenticated canonical emotion middleware at
+`http://127.0.0.1:18765`. Its token is generated per process and passed only via
+the child-process environment. Set `CAMERA_ENABLED=false` to keep the camera
+closed; audio and text turns continue normally.
+
+Metadata-only per-turn traces are written to:
+
+```text
+runtime/debug/emotion_turns/<turn_id>/
+```
+
+For live browser diagnostics, `window.__lastEmotionAnalysis` contains the most
+recent canonical result and `window.__lastAvatarState` contains the dispatched
+Live2D state. Neither object contains raw media or credentials.
+
 On first startup, the default `sherpa_onnx_asr` setting may download the SenseVoice model into:
 
 ```text
@@ -79,4 +94,5 @@ VAD speech end
 -> Live2D
 ```
 
-Future integration code belongs under `apps/backend/app/integration/`.
+Canonical orchestration remains under `apps/backend/app/integration/`; the
+upstream checkout contains only the documented loopback and frontend adapters.

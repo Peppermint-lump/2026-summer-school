@@ -11,6 +11,7 @@ import yaml
 
 from packages.schemas import (
     AppConfig,
+    AudioAnalysisConfig,
     CameraCaptureConfig,
     FusionConfig,
     TextAnalysisConfig,
@@ -56,10 +57,14 @@ def load_app_config(
     camera = _mapping(capture, "camera")
     emotion = _mapping(root, "emotion")
     video = _mapping(emotion, "video")
+    audio = _mapping(emotion, "audio")
     text = _mapping(emotion, "text")
     fusion = _mapping(root, "fusion")
     video_prompt_path = _resolve_prompt_path(
         repository_root, _string(video, "prompt_path"), modality="video"
+    )
+    audio_prompt_path = _resolve_prompt_path(
+        repository_root, _string(audio, "prompt_path"), modality="audio"
     )
     text_prompt_path = _resolve_prompt_path(
         repository_root, _string(text, "prompt_path"), modality="text"
@@ -68,7 +73,11 @@ def load_app_config(
     try:
         return AppConfig(
             camera=CameraCaptureConfig(
-                enabled=_boolean(camera, "enabled"),
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "CAMERA_ENABLED",
+                    default=_boolean(camera, "enabled"),
+                ),
                 device_index=_integer(camera, "device_index"),
                 width=_integer(camera, "width"),
                 height=_integer(camera, "height"),
@@ -111,6 +120,39 @@ def load_app_config(
                 minimum_quality=_number(video, "minimum_quality"),
                 action_minimum_confidence=_number(video, "action_minimum_confidence"),
                 action_emotion_weight=_number(video, "action_emotion_weight"),
+            ),
+            audio_emotion=AudioAnalysisConfig(
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "AUDIO_EMOTION_ENABLED",
+                    default=_boolean(audio, "enabled"),
+                ),
+                provider=_environment_string(
+                    effective_environment,
+                    "AUDIO_EMOTION_PROVIDER",
+                    default=_string(audio, "provider"),
+                ),
+                model=_environment_string(
+                    effective_environment,
+                    "MIMO_MODEL",
+                    default=_string(audio, "model"),
+                ),
+                base_url=_environment_string(
+                    effective_environment,
+                    "MIMO_BASE_URL",
+                    default=_string(audio, "base_url"),
+                ),
+                api_key_secret_name=_string(audio, "api_key_secret_name"),
+                timeout_seconds=_environment_number(
+                    effective_environment,
+                    "AUDIO_EMOTION_TIMEOUT_SECONDS",
+                    default=_number(audio, "timeout_seconds"),
+                ),
+                max_retries=_integer(audio, "max_retries"),
+                prompt_path=audio_prompt_path,
+                prompt_version=_string(audio, "prompt_version"),
+                minimum_quality=_number(audio, "minimum_quality"),
+                max_media_bytes=_integer(audio, "max_media_bytes"),
             ),
             text_emotion=TextAnalysisConfig(
                 enabled=_environment_boolean(

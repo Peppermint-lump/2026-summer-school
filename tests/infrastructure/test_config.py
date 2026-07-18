@@ -23,6 +23,18 @@ capture:
     max_sampled_frames: 12
     retain_media: false
 emotion:
+  audio:
+    enabled: false
+    provider: mimo
+    model: mimo-v2.5
+    base_url: https://mimo.invalid/v1
+    api_key_secret_name: MIMO_API_KEY
+    timeout_seconds: 20
+    max_retries: 2
+    prompt_path: prompt.txt
+    prompt_version: audio_emotion_v1
+    minimum_quality: 0.35
+    max_media_bytes: 25165824
   video:
     enabled: false
     provider: mimo
@@ -66,6 +78,7 @@ class ConfigTests(unittest.TestCase):
             config = load_app_config(path, repository_root=root)
             self.assertTrue(config.camera.enabled)
             self.assertFalse(config.video_emotion.enabled)
+            self.assertFalse(config.audio_emotion.enabled)
             self.assertEqual(config.video_emotion.model, "mimo-v2.5")
 
     def test_rejects_prompt_path_escape(self) -> None:
@@ -90,10 +103,13 @@ class ConfigTests(unittest.TestCase):
                 path,
                 repository_root=root,
                 environment={
+                    "CAMERA_ENABLED": "false",
                     "VIDEO_EMOTION_ENABLED": "true",
+                    "AUDIO_EMOTION_ENABLED": "true",
                     "TEXT_EMOTION_ENABLED": "true",
                     "VIDEO_EMOTION_PROVIDER": "mimo",
                     "VIDEO_EMOTION_TIMEOUT_SECONDS": "45",
+                    "AUDIO_EMOTION_TIMEOUT_SECONDS": "40",
                     "MIMO_MODEL": "mimo-test-model",
                     "MIMO_BASE_URL": "https://mimo.example/v1",
                     "GLM_TEXT_EMOTION_MODEL": "glm-test-model",
@@ -102,7 +118,11 @@ class ConfigTests(unittest.TestCase):
                 },
             )
 
+            self.assertFalse(config.camera.enabled)
             self.assertTrue(config.video_emotion.enabled)
+            self.assertTrue(config.audio_emotion.enabled)
+            self.assertEqual(config.audio_emotion.model, "mimo-test-model")
+            self.assertEqual(config.audio_emotion.timeout_seconds, 40)
             self.assertEqual(config.video_emotion.model, "mimo-test-model")
             self.assertEqual(config.video_emotion.base_url, "https://mimo.example/v1")
             self.assertEqual(config.video_emotion.timeout_seconds, 45)

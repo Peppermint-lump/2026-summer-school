@@ -193,3 +193,27 @@ class ModalityEmotion:
             evidence=evidence,
             raw_metadata=raw_metadata or {},
         )
+
+    @classmethod
+    def audio_result(
+        cls,
+        *,
+        label: EmotionLabel,
+        confidence: float,
+        quality: float,
+        status: EmotionStatus,
+        fine_emotion: str | None = None,
+        evidence: tuple[str, ...] = (),
+        raw_metadata: dict[str, Any] | None = None,
+    ) -> ModalityEmotion:
+        return cls(
+            modality=Modality.AUDIO,
+            label=label,
+            confidence=confidence,
+            quality=quality,
+            reliability=round(confidence * quality, 10),
+            status=status,
+            fine_emotion=fine_emotion,
+            evidence=evidence,
+            raw_metadata=raw_metadata or {},
+        )
