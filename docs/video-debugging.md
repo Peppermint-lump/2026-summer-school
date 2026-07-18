@@ -48,19 +48,16 @@ macOS 首次运行时需要在系统摄像头权限窗口中明确允许当前�
 
 ## 4. MiMo provider smoke test
 
-这是一次显式、可能产生费用的当前 turn 媒体上传。先在本地配置中填写从
-MiMo 控制台获得的 HTTPS Base URL，并设置：
+这是一次显式、可能产生费用的当前 turn 媒体上传。先复制 `.env.example` 为
+被 Git 忽略的 `.env`，填写 `MIMO_API_KEY`，确认 `MIMO_BASE_URL`，并设置：
 
-```yaml
-emotion:
-  video:
-    enabled: true
+```dotenv
+VIDEO_EMOTION_ENABLED=true
 ```
 
-密钥只通过环境变量提供：
+模型、端点和开关会从 `.env` 覆盖本地 YAML。然后运行：
 
 ```bash
-export MIMO_API_KEY='your-local-key'
 .venv/bin/python scripts/debug_video_pipeline.py --mode provider --duration 5
 ```
 

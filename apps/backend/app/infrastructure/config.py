@@ -18,7 +18,7 @@ class ConfigError(ValueError):
 
 class EnvironmentSecretStore:
     def __init__(self, environment: Mapping[str, str] | None = None) -> None:
-        self._environment = environment or os.environ
+        self._environment = os.environ if environment is None else environment
 
     def get_required(self, name: str) -> str:
         value = self._environment.get(name)
@@ -29,7 +29,13 @@ class EnvironmentSecretStore:
         return value
 
 
-def load_app_config(path: Path, *, repository_root: Path) -> AppConfig:
+def load_app_config(
+    path: Path,
+    *,
+    repository_root: Path,
+    environment: Mapping[str, str] | None = None,
+) -> AppConfig:
+    effective_environment = os.environ if environment is None else environment
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -66,10 +72,26 @@ def load_app_config(path: Path, *, repository_root: Path) -> AppConfig:
                 retain_media=_boolean(camera, "retain_media"),
             ),
             video_emotion=VideoAnalysisConfig(
-                enabled=_boolean(video, "enabled"),
-                provider=_string(video, "provider"),
-                model=_string(video, "model"),
-                base_url=_string(video, "base_url"),
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "VIDEO_EMOTION_ENABLED",
+                    default=_boolean(video, "enabled"),
+                ),
+                provider=_environment_string(
+                    effective_environment,
+                    "VIDEO_EMOTION_PROVIDER",
+                    default=_string(video, "provider"),
+                ),
+                model=_environment_string(
+                    effective_environment,
+                    "MIMO_MODEL",
+                    default=_string(video, "model"),
+                ),
+                base_url=_environment_string(
+                    effective_environment,
+                    "MIMO_BASE_URL",
+                    default=_string(video, "base_url"),
+                ),
                 api_key_secret_name=_string(video, "api_key_secret_name"),
                 timeout_seconds=_number(video, "timeout_seconds"),
                 max_retries=_integer(video, "max_retries"),
@@ -115,3 +137,26 @@ def _number(value: Mapping[str, Any], key: str) -> float:
     if isinstance(result, bool) or not isinstance(result, (int, float)):
         raise ConfigError(f"configuration '{key}' must be a number")
     return float(result)
+
+
+def _environment_string(
+    environment: Mapping[str, str], key: str, *, default: str
+) -> str:
+    result = environment.get(key, default).strip()
+    if not result:
+        raise ConfigError(f"environment variable '{key}' must be non-empty")
+    return result
+
+
+def _environment_boolean(
+    environment: Mapping[str, str], key: str, *, default: bool
+) -> bool:
+    raw_value = environment.get(key)
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigError(f"environment variable '{key}' must be a boolean")

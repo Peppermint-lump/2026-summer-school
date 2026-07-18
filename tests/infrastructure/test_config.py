@@ -60,6 +60,28 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaises(ConfigError):
                 load_app_config(path, repository_root=root)
 
+    def test_environment_overrides_provider_model_endpoint_and_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "prompt.txt").write_text("visual only", encoding="utf-8")
+            path = root / "config.yaml"
+            path.write_text(VALID_CONFIG, encoding="utf-8")
+
+            config = load_app_config(
+                path,
+                repository_root=root,
+                environment={
+                    "VIDEO_EMOTION_ENABLED": "true",
+                    "VIDEO_EMOTION_PROVIDER": "mimo",
+                    "MIMO_MODEL": "mimo-test-model",
+                    "MIMO_BASE_URL": "https://mimo.example/v1",
+                },
+            )
+
+            self.assertTrue(config.video_emotion.enabled)
+            self.assertEqual(config.video_emotion.model, "mimo-test-model")
+            self.assertEqual(config.video_emotion.base_url, "https://mimo.example/v1")
+
     def test_secret_store_does_not_fabricate_missing_key(self) -> None:
         with self.assertRaises(ConfigError):
             EnvironmentSecretStore({}).get_required("MIMO_API_KEY")

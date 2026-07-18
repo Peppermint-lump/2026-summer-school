@@ -21,6 +21,7 @@ from apps.backend.app.emotion.video.face_quality import (
     OpenCVFaceDetector,
 )
 from apps.backend.app.infrastructure.config import ConfigError, load_app_config
+from apps.backend.app.infrastructure.environment import load_project_environment
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
@@ -39,6 +40,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
+        load_project_environment(REPOSITORY_ROOT)
         config = load_app_config(args.config.resolve(), repository_root=REPOSITORY_ROOT)
         if not config.camera.enabled:
             raise ConfigError("camera is disabled in the local configuration")

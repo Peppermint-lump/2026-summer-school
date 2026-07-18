@@ -26,7 +26,9 @@ The local runtime config is:
 third_party/Open-LLM-VTuber/conf.yaml
 ```
 
-It is intentionally ignored by Git because it may contain local provider settings and secrets. The current generated config is based on `config_templates/conf.default.yaml` with the server host changed to `127.0.0.1`.
+It is intentionally ignored by Git. Provider secrets belong only in the
+repository-root `.env`; the generated config contains environment references,
+not credential values. See `docs/model-api-configuration.md`.
 
 ## Run in development
 
@@ -40,6 +42,13 @@ Then run:
 
 ```powershell
 .\scripts\start-open-llm-vtuber.ps1
+```
+
+On macOS/Linux, validate and start through the environment-aware adapter:
+
+```bash
+third_party/Open-LLM-VTuber/.venv/bin/python scripts/start_open_llm_vtuber.py --check-only
+third_party/Open-LLM-VTuber/.venv/bin/python scripts/start_open_llm_vtuber.py
 ```
 
 The default development endpoint is:

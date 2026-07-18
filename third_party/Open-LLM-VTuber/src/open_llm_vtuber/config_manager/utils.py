@@ -13,6 +13,10 @@ from .main import Config
 T = TypeVar("T", bound=BaseModel)
 
 
+class ConfigValidationError(ValueError):
+    """A field-level validation failure with provider values redacted."""
+
+
 def read_yaml(config_path: str) -> Dict[str, Any]:
     """
     Read the specified YAML configuration file with environment variable substitution
@@ -67,11 +71,19 @@ def validate_config(config_data: dict) -> Config:
     """
     try:
         return Config(**config_data)
-    except ValidationError as e:
-        logger.critical(f"Error validating configuration: {e}")
-        logger.error("Configuration data:")
-        logger.error(config_data)
-        raise e
+    except ValidationError as exc:
+        details = "; ".join(
+            f"{'.'.join(str(part) for part in error['loc'])}: "
+            f"{error['msg']} ({error['type']})"
+            for error in exc.errors(
+                include_url=False,
+                include_context=False,
+                include_input=False,
+            )
+        )
+        message = f"configuration validation failed: {details}"
+        logger.critical(message)
+        raise ConfigValidationError(message) from None
 
 
 def load_text_file_with_guess_encoding(file_path: str) -> str | None:

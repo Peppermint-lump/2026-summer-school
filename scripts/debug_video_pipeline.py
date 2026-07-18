@@ -36,6 +36,7 @@ from apps.backend.app.infrastructure.config import (
     EnvironmentSecretStore,
     load_app_config,
 )
+from apps.backend.app.infrastructure.environment import load_project_environment
 from apps.backend.app.infrastructure.http_client import HttpxJsonClient
 from apps.backend.app.integration.video_emotion_middleware import (
     VideoEmotionMiddleware,
@@ -193,6 +194,7 @@ def main() -> int:
     args = parse_args()
     logging.basicConfig(level=logging.INFO)
     try:
+        load_project_environment(REPOSITORY_ROOT)
         config = load_app_config(args.config.resolve(), repository_root=REPOSITORY_ROOT)
         if args.mode == "camera":
             return run_camera_smoke(config, args.duration)

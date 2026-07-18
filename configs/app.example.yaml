@@ -15,7 +15,7 @@ emotion:
     enabled: false
     provider: mimo
     model: mimo-v2.5
-    base_url: "https://<configured-mimo-base-url>/v1"
+    base_url: "https://api.xiaomimimo.com/v1"
     api_key_secret_name: MIMO_API_KEY
     timeout_seconds: 20
     max_retries: 2

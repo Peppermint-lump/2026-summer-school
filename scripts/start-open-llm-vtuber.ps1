@@ -1,5 +1,6 @@
 param(
     [switch] $SkipSync,
+    [switch] $CheckOnly,
     [string] $HostAddress = "127.0.0.1",
     [int] $Port = 12393
 )
@@ -15,6 +16,7 @@ $localUv = Join-Path $repoRoot ".tools\uv\bin\uv.exe"
 $uvCacheDir = Join-Path $repoRoot ".tools\uv-cache"
 $uvToolDir = Join-Path $repoRoot ".tools\uv-tools"
 $venvPython = Join-Path $upstreamDir ".venv\Scripts\python.exe"
+$pythonLauncher = Join-Path $repoRoot "scripts\start_open_llm_vtuber.py"
 
 if (-not (Test-Path -LiteralPath $upstreamDir)) {
     throw "Open-LLM-VTuber is missing at $upstreamDir"
@@ -64,7 +66,11 @@ try {
         throw "Virtual environment Python not found at $venvPython. Run without -SkipSync first."
     }
 
-    & $venvPython run_server.py
+    $launcherArgs = @($pythonLauncher)
+    if ($CheckOnly) {
+        $launcherArgs += "--check-only"
+    }
+    & $venvPython @launcherArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Open-LLM-VTuber exited with code $LASTEXITCODE."
     }

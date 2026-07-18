@@ -21,6 +21,19 @@
 - Expected behavior: the model list resolves each local `model_dict.json` URL, rejects paths escaping `live2d-models/`, and retains compatibility with the original flat layout.
 - Regression test: `tests/test_live2d_model_discovery.py` covers Xiaohudie, Felix, legacy flat models, and path traversal rejection.
 
+### Configuration validation secret redaction
+
+- Reason: upstream logged the complete parsed configuration after validation
+  failures, which could expose environment-substituted provider credentials.
+- Upstream file and function:
+  `src/open_llm_vtuber/config_manager/utils.py::validate_config`.
+- Expected behavior: validation errors retain the field path, message, and error
+  type, but omit input values, the full configuration, and the original
+  Pydantic exception chain.
+- Validation: pass an invalid configuration containing a sentinel secret and
+  verify the captured log output contains the validation error but not the
+  sentinel.
+
 ### Xiaohudie runtime asset adaptation
 
 - Reason: VTube Studio expressions and hotkey motions were toggle-style and could remain active or overlap in Open-LLM-VTuber.
