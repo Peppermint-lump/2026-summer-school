@@ -76,7 +76,9 @@ Project-specific behavior should be added through adapters under `apps/backend/a
 ## Felix selectable character
 
 - Upstream files: `model_dict.json`, `characters/felix.yaml`, `frontend/avatar-motion-controller.js`.
-- Local runtime files: `live2d-models/felix/runtime/` (private and Git-ignored).
+- Runtime files: `live2d-models/felix/runtime/` (tracked only under the
+  repository-scoped owner authorization recorded in `AGENTS.md` and `SSOT.md`;
+  redistribution outside that scope remains excluded).
 - Reason: register the locally supplied Felix model as a second selectable character while keeping Xiaohudie as the default.
 - Adaptation: the runtime `wd66.model3.json` registers the supplied expression presets and `ParamMouthOpenY`; only emotion-safe presets are exposed through `emotionMap`. Outfit, prop, and pose toggles remain available to the model but are not selected by the LLM.
 - Persona and voice isolation: `felix_001` contains Felix's identity and speaking style and selects the local `zh_CN-chaowen-medium` Piper male voice; it does not alter the base Xiaohudie persona or `zh_CN-huayan-medium` voice.
