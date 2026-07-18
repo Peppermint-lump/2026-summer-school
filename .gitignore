@@ -36,6 +36,8 @@ third_party/Open-LLM-VTuber/zh_CN-huayan-medium.onnx.json
 # Purchased/private Live2D assets
 assets/live2d/xiaohudie-original/
 assets/live2d/xiaohudie-runtime/
+Felix/
+third_party/Open-LLM-VTuber/live2d-models/felix/
 【VTS用】2.0小蝴蝶运行文件/
 
 # Purchased/private scene backgrounds
@@ -50,3 +52,6 @@ Thumbs.db
 .idea/
 .vscode/
 tests/
+!/tests/
+/tests/*
+!/tests/avatar-motion-controller.test.cjs

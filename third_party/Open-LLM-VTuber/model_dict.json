@@ -31,7 +31,7 @@
         "name": "xiaohudie",
         "description": "2.0 xiaohudie Live2D runtime copy",
         "url": "/live2d-models/xiaohudie/runtime/xiaohudie.model3.json",
-        "kScale": 0.75,
+        "kScale": 0.65,
         "initialXshift": 0,
         "initialYshift": 0,
         "kXOffset": 1150,
@@ -54,5 +54,29 @@
                 "HoldBear": 1
             }
         }
+    },
+    {
+        "name": "felix",
+        "description": "Felix Live2D runtime copy",
+        "url": "/live2d-models/felix/runtime/wd66.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0,
+            "joy": 13,
+            "star": 13,
+            "blush": 17,
+            "shy": 17,
+            "sleepy": 18,
+            "heart": 19,
+            "sadness": 20,
+            "cry": 20,
+            "pout": 21,
+            "anger": 23
+        },
+        "tapMotions": {}
     }
 ]

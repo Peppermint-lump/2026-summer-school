@@ -55,7 +55,7 @@ Project-specific behavior should be added through adapters under `apps/backend/a
 
 - Reason: Cubism restarts the `Idle` group after a one-shot motion finishes, but the Xiaohudie Idle resource controls only three parameters and none of the 11, 6, and 203 parameters touched by Greeting, CatchButterfly, and HoldBear. Saved special-motion values therefore survive the Idle restart.
 - Upstream files: `frontend/index.html`; `frontend/avatar-motion-controller.js`; `src/open_llm_vtuber/agent/transformers.py`.
-- Expected behavior: tap motions are routed through one controller. It captures a pre-motion parameter/part-opacity baseline and waits on the exact queue handle returned by `startMotion` using `CubismMotionQueueManager.isFinishedByHandle`. A replacement request cancels the old request, cancels its animation-frame poll, calls the SDK's `stopAllMotions`, restores the baseline, and starts only the newest special motion. Natural completion restores the baseline, applies `neutral`, and starts `Idle`. Backend expression extraction emits at most one legal expression index and never uses implicit motion indices.
+- Expected behavior: tap motions are routed through one controller. It captures a pre-motion parameter/part-opacity baseline and waits on the exact queue handle returned by `startMotion` using `CubismMotionQueueManager.isFinishedByHandle`. Greeting, CatchButterfly, and HoldBear remain visible for at least 5, 6, and 3 seconds respectively; an early SDK completion holds the final pose until that presentation window ends. A replacement request cancels the old request, cancels its animation-frame poll, calls the SDK's `stopAllMotions`, restores the baseline, and starts only the newest special motion. Natural completion interpolates parameters and part opacity back to the baseline over 500 ms, applies `neutral`, and then starts `Idle`. Backend expression extraction emits at most one legal expression index and never uses implicit motion indices.
 - Debugging: set `localStorage.live2dDebug = "true"` and reload to log controller attachment, model count, motion group/index, timing, completion source, token/state, restored values, and Idle restart. No per-frame logging is added.
 - Validation: test Idle -> each special motion -> Idle, the ordered three-motion sequence, and rapid Greeting -> HoldBear. Confirm one model instance, stale callback suppression, restored props/pose, and continued TTS/lip sync.
 
@@ -65,3 +65,13 @@ Project-specific behavior should be added through adapters under `apps/backend/a
 - Upstream files: `frontend/index.html`; `frontend/adaptive-background.js`; `src/open_llm_vtuber/config_manager/utils.py`; private runtime files under `backgrounds/`.
 - Expected behavior: the background component renders MP4/WebM sources as muted, looping, inline video with `object-fit: cover`; it selects daytime from `06:00` through `16:59` and nighttime otherwise, checking once per minute.
 - Validation: verify both runtime videos return HTTP 200, force each time branch in browser developer tools, and confirm the video fills the viewport without stretching while Live2D remains interactive above it.
+
+## Felix selectable character
+
+- Upstream files: `model_dict.json`, `characters/felix.yaml`, `frontend/avatar-motion-controller.js`.
+- Local runtime files: `live2d-models/felix/runtime/` (private and Git-ignored).
+- Reason: register the locally supplied Felix model as a second selectable character while keeping Xiaohudie as the default.
+- Adaptation: the runtime `wd66.model3.json` registers the supplied expression presets and `ParamMouthOpenY`; only emotion-safe presets are exposed through `emotionMap`. Outfit, prop, and pose toggles remain available to the model but are not selected by the LLM.
+- Persona and voice isolation: `felix_001` contains Felix's identity and speaking style and selects the local `zh_CN-chaowen-medium` Piper male voice; it does not alter the base Xiaohudie persona or `zh_CN-huayan-medium` voice.
+- Controller boundary: the Xiaohudie special-motion lifecycle patch now activates only for models that provide `Greeting`, `CatchButterfly`, and `HoldBear`, so switching to Felix preserves its native expression behavior.
+- Validation: parse both JSON files, validate `felix.yaml`, verify every referenced Felix runtime file and both Piper voice files exist, synthesize a Chinese smoke-test sentence, and switch between `xiaohudie_001` and `felix_001` in the frontend.
