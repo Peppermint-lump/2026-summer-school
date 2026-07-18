@@ -2,10 +2,12 @@
 .env
 .env.*
 !.env.example
+configs/app.local.yaml
 
 # Python and tooling
 __pycache__/
 *.py[cod]
+*.egg-info/
 .tools/
 .pytest_cache/
 .ruff_cache/
@@ -49,4 +51,3 @@ third_party/Open-LLM-VTuber/backgrounds/xiaohudie-night.mp4
 Thumbs.db
 .idea/
 .vscode/
-tests/

@@ -1,0 +1,24 @@
+capture:
+  camera:
+    enabled: false  # 必须由用户在 UI 中主动开启
+    device_index: 0
+    width: 640
+    height: 480
+    target_fps: 10
+    buffer_seconds: 30
+    sample_fps: 2
+    max_sampled_frames: 12
+    retain_media: false
+
+emotion:
+  video:
+    enabled: false
+    provider: mimo
+    model: mimo-v2.5
+    base_url: "https://<configured-mimo-base-url>/v1"
+    api_key_secret_name: MIMO_API_KEY
+    timeout_seconds: 20
+    max_retries: 2
+    prompt_path: configs/prompts/video_emotion_v1.txt
+    prompt_version: video_emotion_v1
+    minimum_quality: 0.45
