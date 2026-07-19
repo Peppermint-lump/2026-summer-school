@@ -113,6 +113,22 @@ possible.
   `tests/test_continuous_visual_motion.py` validates edge/cooldown gating;
   `tests/test_avatar_motion_controller.js` validates motion, restoration, and Idle.
 
+### Optional visual debug overlay
+
+- Reason: the continuous-visual status overlay was created on every VTuber page,
+  including the formal user-facing entry point. It is diagnostic UI and must not
+  cover the avatar during ordinary use.
+- Upstream file and functions:
+  `frontend/avatar-state-bridge.js::visualStatusPanel` and
+  `applyAvatarState`.
+- Expected behavior: the formal URL does not create the visual status overlay;
+  adding `?visualDebug=1` displays the full action, emotion, reliability, turn,
+  trace, and avatar-motion diagnostics. Hiding the overlay does not disable
+  continuous visual inference, expression application, motion dispatch, or
+  frontend events.
+- Regression test: `tests/avatar-state-bridge.test.cjs` exercises both URL modes
+  and confirms that formal mode still applies visual avatar motions.
+
 ### Typed-turn visual alignment and fused-expression arbitration
 
 - Reason: a typed input has no audio duration, so using its speech interval for

@@ -10,20 +10,23 @@
     new URLSearchParams(window.location.search).get("visualDebug") === "1";
 
   function visualStatusPanel() {
+    if (!visualDebugEnabled) {
+      return null;
+    }
     let panel = document.getElementById("vtuber-visual-status");
     if (panel) {
       return panel;
     }
     panel = document.createElement("div");
     panel.id = "vtuber-visual-status";
-    panel.dataset.mode = visualDebugEnabled ? "debug" : "normal";
+    panel.dataset.mode = "debug";
     panel.textContent = "视觉：等待首次分析";
     Object.assign(panel.style, {
       position: "fixed",
       top: "12px",
       right: "12px",
       zIndex: "2147483647",
-      maxWidth: visualDebugEnabled ? "520px" : "300px",
+      maxWidth: "520px",
       padding: "8px 12px",
       borderRadius: "10px",
       color: "#ecfdf5",
@@ -63,14 +66,19 @@
         `\n轨迹：${payload.trace_directory || "未启用"}`
       : "";
     const panel = visualStatusPanel();
+    if (!panel) {
+      return;
+    }
     panel.textContent = summary + detail;
     panel.title = payload.trace_directory || "";
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", visualStatusPanel, { once: true });
-  } else {
-    visualStatusPanel();
+  if (visualDebugEnabled) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", visualStatusPanel, { once: true });
+    } else {
+      visualStatusPanel();
+    }
   }
 
   const NativeWebSocket = window.WebSocket;
@@ -103,23 +111,25 @@
     }
     if (payload.source === "continuous-video") {
       const panel = visualStatusPanel();
-      panel.dataset.motion = payload.motion || "idle";
-      const withoutMotion = panel.textContent
-        .split("\n")
-        .filter((line) =>
-          !line.startsWith("角色动作：") &&
-          !line.startsWith("融合表情保护：")
-        );
-      panel.textContent = withoutMotion
-        .concat(`角色动作：${payload.motion || "idle"}`)
-        .concat(
-          `融合表情保护：${payload.expression_suppressed ? "开启" : "关闭"}`,
-        )
-        .join("\n");
-      panel.title = [
-        panel.title,
-        `角色动作：${payload.motion || "idle"}`,
-      ].filter(Boolean).join("\n");
+      if (panel) {
+        panel.dataset.motion = payload.motion || "idle";
+        const withoutMotion = panel.textContent
+          .split("\n")
+          .filter((line) =>
+            !line.startsWith("角色动作：") &&
+            !line.startsWith("融合表情保护：")
+          );
+        panel.textContent = withoutMotion
+          .concat(`角色动作：${payload.motion || "idle"}`)
+          .concat(
+            `融合表情保护：${payload.expression_suppressed ? "开启" : "关闭"}`,
+          )
+          .join("\n");
+        panel.title = [
+          panel.title,
+          `角色动作：${payload.motion || "idle"}`,
+        ].filter(Boolean).join("\n");
+      }
     }
     window.dispatchEvent(
       new CustomEvent("vtuber-avatar-state", { detail: payload }),
