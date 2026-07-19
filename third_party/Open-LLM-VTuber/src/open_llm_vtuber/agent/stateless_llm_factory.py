@@ -39,6 +39,12 @@ class LLMFactory:
                 organization_id=kwargs.get("organization_id"),
                 project_id=kwargs.get("project_id"),
                 temperature=kwargs.get("temperature"),
+                request_timeout_seconds=kwargs.get("request_timeout_seconds", 30.0),
+                first_response_timeout_seconds=kwargs.get(
+                    "first_response_timeout_seconds", 20.0
+                ),
+                max_retries=kwargs.get("max_retries", 1),
+                thinking_mode=kwargs.get("thinking_mode", "provider_default"),
             )
         if llm_provider == "stateless_llm_with_template":
             return StatelessLLMWithTemplate(

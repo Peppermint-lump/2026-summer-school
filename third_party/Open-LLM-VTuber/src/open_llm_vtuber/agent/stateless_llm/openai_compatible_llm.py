@@ -3,9 +3,9 @@ This class is responsible for handling asynchronous interaction with OpenAI API 
 endpoints for language generation.
 """
 
-from typing import AsyncIterator, List, Dict, Any
+import asyncio
+from typing import AsyncIterator, List, Dict, Any, Literal
 from openai import (
-    AsyncStream,
     AsyncOpenAI,
     APIError,
     APIConnectionError,
@@ -13,12 +13,13 @@ from openai import (
     NotGiven,
     NOT_GIVEN,
 )
-from openai.types.chat import ChatCompletionChunk
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 from loguru import logger
 
 from .stateless_llm_interface import StatelessLLMInterface
 from ...mcpp.types import ToolCallObject
+
+RECOVERY_RESPONSE = "抱歉，我刚才没有及时收到回复。我们可以再试一次。"
 
 
 class AsyncLLM(StatelessLLMInterface):
@@ -30,6 +31,12 @@ class AsyncLLM(StatelessLLMInterface):
         organization_id: str = "z",
         project_id: str = "z",
         temperature: float = 1.0,
+        request_timeout_seconds: float = 30.0,
+        first_response_timeout_seconds: float = 20.0,
+        max_retries: int = 1,
+        thinking_mode: Literal[
+            "provider_default", "enabled", "disabled"
+        ] = "provider_default",
     ):
         """
         Initializes an instance of the `AsyncLLM` class.
@@ -45,11 +52,15 @@ class AsyncLLM(StatelessLLMInterface):
         self.base_url = base_url
         self.model = model
         self.temperature = temperature
+        self.first_response_timeout_seconds = first_response_timeout_seconds
+        self.thinking_mode = thinking_mode
         self.client = AsyncOpenAI(
             base_url=base_url,
             organization=organization_id,
             project=project_id,
             api_key=llm_api_key,
+            timeout=request_timeout_seconds,
+            max_retries=max_retries,
         )
         self.support_tools = True
 
@@ -93,24 +104,57 @@ class AsyncLLM(StatelessLLMInterface):
                     {"role": "system", "content": system},
                     *messages,
                 ]
-            logger.debug(f"Messages: {messages_with_system}")
+            logger.debug(
+                "Preparing LLM request with {} messages (system_prompt={})",
+                len(messages_with_system),
+                bool(system),
+            )
 
             available_tools = tools if self.support_tools else NOT_GIVEN
 
-            stream: AsyncStream[
-                ChatCompletionChunk
-            ] = await self.client.chat.completions.create(
-                messages=messages_with_system,
-                model=self.model,
-                stream=True,
-                temperature=self.temperature,
-                tools=available_tools,
+            request_options: Dict[str, Any] = {
+                "messages": messages_with_system,
+                "model": self.model,
+                "stream": True,
+                "temperature": self.temperature,
+                "tools": available_tools,
+            }
+            if self.thinking_mode != "provider_default":
+                request_options["extra_body"] = {
+                    "thinking": {"type": self.thinking_mode}
+                }
+
+            loop = asyncio.get_running_loop()
+            request_started = loop.time()
+            first_response_deadline = loop.time() + self.first_response_timeout_seconds
+            stream = await asyncio.wait_for(
+                self.client.chat.completions.create(**request_options),
+                timeout=self.first_response_timeout_seconds,
             )
             logger.debug(
                 f"Tool Support: {self.support_tools}, Available tools: {available_tools}"
             )
 
-            async for chunk in stream:
+            stream_iterator = stream.__aiter__()
+            first_visible_response = False
+            while True:
+                try:
+                    if first_visible_response:
+                        chunk = await stream_iterator.__anext__()
+                    else:
+                        remaining = first_response_deadline - loop.time()
+                        if remaining <= 0:
+                            raise asyncio.TimeoutError
+                        chunk = await asyncio.wait_for(
+                            stream_iterator.__anext__(), timeout=remaining
+                        )
+                except StopAsyncIteration:
+                    break
+
+                if len(chunk.choices) == 0:
+                    logger.debug("Empty LLM stream chunk received")
+                    continue
+
                 if self.support_tools:
                     has_tool_calls = (
                         hasattr(chunk.choices[0].delta, "tool_calls")
@@ -174,16 +218,25 @@ class AsyncLLM(StatelessLLMInterface):
                             for tool_data in accumulated_tool_calls.values()
                         ]
 
+                        if not first_visible_response:
+                            logger.info(
+                                "LLM first visible tool response received in {:.0f} ms",
+                                (loop.time() - request_started) * 1000,
+                            )
+                        first_visible_response = True
                         yield complete_tool_calls
                         accumulated_tool_calls = {}  # Reset for potential future tool calls
 
                 # Process regular content chunks
-                if len(chunk.choices) == 0:
-                    logger.info("Empty chunk received")
-                    continue
-                elif chunk.choices[0].delta.content is None:
-                    chunk.choices[0].delta.content = ""
-                yield chunk.choices[0].delta.content
+                content = chunk.choices[0].delta.content or ""
+                if content:
+                    if not first_visible_response:
+                        logger.info(
+                            "LLM first visible text received in {:.0f} ms",
+                            (loop.time() - request_started) * 1000,
+                        )
+                    first_visible_response = True
+                    yield content
 
             # If stream ends while still in a tool call, make sure to yield the tool call
             if in_tool_call and accumulated_tool_calls:
@@ -195,7 +248,27 @@ class AsyncLLM(StatelessLLMInterface):
                     for tool_data in accumulated_tool_calls.values()
                 ]
 
+                first_visible_response = True
                 yield complete_tool_calls
+
+            if not first_visible_response:
+                logger.error(
+                    "LLM stream ended without visible response text "
+                    "(provider={}, model={}).",
+                    self.base_url,
+                    self.model,
+                )
+                yield RECOVERY_RESPONSE
+
+        except asyncio.TimeoutError:
+            logger.error(
+                "LLM did not produce visible response text within {} seconds "
+                "(provider={}, model={}).",
+                self.first_response_timeout_seconds,
+                self.base_url,
+                self.model,
+            )
+            yield RECOVERY_RESPONSE
 
         except APIConnectionError as e:
             logger.error(
@@ -220,7 +293,7 @@ class AsyncLLM(StatelessLLMInterface):
             logger.error(f"LLM API: Error occurred: {e}")
             logger.info(f"Base URL: {self.base_url}")
             logger.info(f"Model: {self.model}")
-            logger.info(f"Messages: {messages}")
+            logger.info("Message count: {}", len(messages))
             logger.info(f"temperature: {self.temperature}")
             yield "Error calling the chat endpoint: Error occurred while generating response. See the logs for details."
 

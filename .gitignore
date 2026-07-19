@@ -58,3 +58,7 @@ tests/
 !/tests/
 /tests/*
 !/tests/avatar-motion-controller.test.cjs
+!/tests/avatar-lipsync-controller.test.cjs
+!/tests/test_qwen3_tts_realtime.py
+!/tests/test_openai_compatible_llm_latency.py
+!/tests/test_xiaohudie_expression_mapping.py

@@ -44,12 +44,27 @@ Project-specific behavior should be added through adapters under `apps/backend/a
 - Expected behavior: `tts_model: piper_tts` invokes `python -X utf8 -m piper` from the active virtual environment and generates a local WAV using the configured `.onnx` voice model. UTF-8 mode is required for Chinese text on Windows.
 - Validation: confirm config parsing, then synthesize a Chinese sentence and verify that the generated WAV is nonempty.
 
+### Qwen3 realtime TTS adapter
+
+- Reason: use Alibaba Model Studio `qwen3-tts-flash-realtime` as the primary voice provider while retaining the existing local Piper path when credentials, network access, or the provider are unavailable.
+- Upstream files: `src/open_llm_vtuber/tts/qwen3_tts_realtime.py`; `src/open_llm_vtuber/tts/tts_factory.py`; `src/open_llm_vtuber/config_manager/tts.py`; `pyproject.toml`; TTS configuration templates and character overrides.
+- Expected behavior: the adapter sends commit-mode text over the DashScope realtime WebSocket, writes the returned 24 kHz WAV audio to the normal cache path, and never logs the API key. A missing `DASHSCOPE_API_KEY`, timeout, connection failure, or provider error automatically invokes the configured per-character Piper model.
+- Voice policy: Xiaohudie uses the Qwen female `Cherry` voice and Felix uses the Qwen male `Ethan` voice. Their Piper fallbacks remain `zh_CN-huayan-medium` and `zh_CN-chaowen-medium` respectively.
+- Validation: mock the WebSocket event stream and verify audio assembly, model URL, authorization transport, and fallback routing without making a paid API call; validate both character configurations and locally synthesize each Piper fallback voice.
+
+### Bounded OpenAI-compatible first response
+
+- Reason: OpenAI-compatible streaming previously inherited the SDK's long default timeout and retries. GLM-4.7 also defaults to thinking mode, while the client discards `reasoning_content`; a stalled or long reasoning stream therefore left the conversation with no subtitle, audio, or visible error for many minutes.
+- Upstream files: `src/open_llm_vtuber/agent/stateless_llm/openai_compatible_llm.py`; `src/open_llm_vtuber/agent/stateless_llm_factory.py`; `src/open_llm_vtuber/config_manager/stateless_llm.py`; LLM configuration templates.
+- Expected behavior: companion-mode GLM requests explicitly enable thinking, network operations and retries are bounded, and the total wait from request creation to the first visible content or completed tool call is capped at 60 seconds. A first-response timeout yields a short visible Chinese recovery response that continues through the normal TTS pipeline. Empty SSE chunks and hidden reasoning chunks do not reset the deadline.
+- Validation: use mocked empty, reasoning-only, hanging, and normal content streams; confirm the thinking request body, first-visible-response deadline, fallback text, stream closure, and normal token delivery. A live bounded probe with the current persona should produce visible content within the configured deadline.
+
 ### Xiaohudie companion expression and tap-motion mapping
 
 - Reason: map the purchased model's named visual effects to the companion safety policy and expose its three non-looping poses without overlapping toggle states.
 - Upstream files: `model_dict.json`; `prompts/utils/live2d_expression_prompt.txt`.
-- Expected behavior: normal, uncertain, and low-affect contexts remain neutral; positive content selects star, heart, or butterfly; compliments use blush; sleepy and cry are restricted to the documented contexts. Named head and body hit areas let taps reliably select Greeting or CatchButterfly from the head and HoldBear from the body.
-- Validation: confirm `Live2dModel('xiaohudie').extract_emotion('[heart] hi') == [5]`, verify all mapped indices are within the eight registered expressions, confirm every non-idle motion has `Loop: false`, then click each hit area after model load.
+- Expected behavior: ordinary and low-affect replies omit a tag instead of repeatedly emitting neutral. Neutral is reserved for explicit reset, uncertainty, cross-modal conflict, and safety-sensitive replies. Both `joy` and `star` select the model's star effect at index 4; heart and butterfly cover warm or playful positive content; compliments use blush; sleepy and cry are restricted to the documented contexts. Named head and body hit areas let taps reliably select Greeting or CatchButterfly from the head and HoldBear from the body.
+- Validation: confirm `Live2dModel('xiaohudie').extract_emotion('[joy] hi') == [4]`, verify `joy` and `star` resolve to the same legal expression index, confirm every non-idle motion has `Loop: false`, then click each hit area after model load.
 
 ### Xiaohudie special-motion lifecycle controller
 
@@ -58,6 +73,13 @@ Project-specific behavior should be added through adapters under `apps/backend/a
 - Expected behavior: tap motions are routed through one controller. It captures a pre-motion parameter/part-opacity baseline and waits on the exact queue handle returned by `startMotion` using `CubismMotionQueueManager.isFinishedByHandle`. Greeting, CatchButterfly, and HoldBear remain visible for at least 5, 6, and 3 seconds respectively; an early SDK completion holds the final pose until that presentation window ends. A replacement request cancels the old request, cancels its animation-frame poll, calls the SDK's `stopAllMotions`, restores the baseline, and starts only the newest special motion. Natural completion interpolates parameters and part opacity back to the baseline over 500 ms, applies `neutral`, and then starts `Idle`. Backend expression extraction emits at most one legal expression index and never uses implicit motion indices.
 - Debugging: set `localStorage.live2dDebug = "true"` and reload to log controller attachment, model count, motion group/index, timing, completion source, token/state, restored values, and Idle restart. No per-frame logging is added.
 - Validation: test Idle -> each special motion -> Idle, the ordered three-motion sequence, and rapid Greeting -> HoldBear. Confirm one model instance, stale callback suppression, restored props/pose, and continued TTS/lip sync.
+
+### Live2D lip-sync lifecycle controller
+
+- Reason: the bundled audio queue clears its `Audio` reference when playback ends but does not release the model's WAV samples or reset `ParamMouthOpenY`. The first reply can therefore leave the mouth open and the reused handler can fail to animate a later reply.
+- Upstream files: `frontend/index.html`; `frontend/avatar-lipsync-controller.js`.
+- Expected behavior: every audio segment starts from a clean WAV/RMS timeline; playback completion, failure, or abort releases stale PCM data, resets timing state, and closes every registered lip-sync parameter. The controller detects newly loaded models after character switching and patches each WAV handler once.
+- Validation: play two consecutive replies and confirm both animate `ParamMouthOpenY`, with the mouth returning to zero after each segment; repeat after switching between Xiaohudie and Felix.
 
 ### Adaptive video backgrounds
 
@@ -72,6 +94,6 @@ Project-specific behavior should be added through adapters under `apps/backend/a
 - Local runtime files: `live2d-models/felix/runtime/` (private and Git-ignored).
 - Reason: register the locally supplied Felix model as a second selectable character while keeping Xiaohudie as the default.
 - Adaptation: the runtime `wd66.model3.json` registers the supplied expression presets and `ParamMouthOpenY`; only emotion-safe presets are exposed through `emotionMap`. Outfit, prop, and pose toggles remain available to the model but are not selected by the LLM.
-- Persona and voice isolation: `felix_001` contains Felix's identity and speaking style and selects the local `zh_CN-chaowen-medium` Piper male voice; it does not alter the base Xiaohudie persona or `zh_CN-huayan-medium` voice.
+- Persona and voice isolation: `felix_001` contains Felix's identity and speaking style and selects the Qwen male `Ethan` voice. Xiaohudie keeps the Qwen female `Cherry` voice. Felix uses the local `zh_CN-chaowen-medium` Piper fallback and Xiaohudie uses `zh_CN-huayan-medium`.
 - Controller boundary: the Xiaohudie special-motion lifecycle patch now activates only for models that provide `Greeting`, `CatchButterfly`, and `HoldBear`, so switching to Felix preserves its native expression behavior.
-- Validation: parse both JSON files, validate `felix.yaml`, verify every referenced Felix runtime file and both Piper voice files exist, synthesize a Chinese smoke-test sentence, and switch between `xiaohudie_001` and `felix_001` in the frontend.
+- Validation: parse both JSON files, validate `felix.yaml`, verify every referenced Felix runtime file and both Piper fallback voice files exist, synthesize a Chinese smoke-test sentence, and switch between `xiaohudie_001` and `felix_001` in the frontend.

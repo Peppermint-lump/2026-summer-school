@@ -71,6 +71,45 @@ class PiperTTSConfig(I18nMixin):
     }
 
 
+class Qwen3TTSRealtimeConfig(I18nMixin):
+    """Configuration for Qwen3 realtime TTS with Piper fallback."""
+
+    api_key: str = Field("", alias="api_key")
+    model: str = Field("qwen3-tts-flash-realtime", alias="model")
+    voice: str = Field("Cherry", alias="voice")
+    url: str = Field("wss://dashscope.aliyuncs.com/api-ws/v1/realtime", alias="url")
+    language_type: str = Field("Auto", alias="language_type")
+    sample_rate: Literal[8000, 16000, 24000, 48000] = Field(24000, alias="sample_rate")
+    timeout_seconds: int = Field(30, alias="timeout_seconds", gt=0)
+    fallback_model_path: str = Field(..., alias="fallback_model_path")
+    fallback_timeout_seconds: int = Field(60, alias="fallback_timeout_seconds", gt=0)
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "api_key": Description(
+            en="DashScope API key; DASHSCOPE_API_KEY is used when empty",
+            zh="DashScope API Key；留空时读取 DASHSCOPE_API_KEY",
+        ),
+        "model": Description(en="Qwen realtime TTS model", zh="Qwen 实时语音模型"),
+        "voice": Description(en="Qwen voice ID", zh="Qwen 音色 ID"),
+        "url": Description(
+            en="DashScope WebSocket endpoint", zh="DashScope WebSocket 地址"
+        ),
+        "language_type": Description(en="Synthesis language mode", zh="合成语言模式"),
+        "sample_rate": Description(en="WAV sample rate", zh="WAV 采样率"),
+        "timeout_seconds": Description(
+            en="Cloud request timeout", zh="云端请求超时秒数"
+        ),
+        "fallback_model_path": Description(
+            en="Local Piper model used on cloud failure",
+            zh="云端失败时使用的本地 Piper 模型",
+        ),
+        "fallback_timeout_seconds": Description(
+            en="Local Piper fallback timeout",
+            zh="本地 Piper 兜底超时秒数",
+        ),
+    }
+
+
 class CosyvoiceTTSConfig(I18nMixin):
     """Configuration for Cosyvoice TTS."""
 
@@ -457,6 +496,7 @@ class TTSConfig(I18nMixin):
         "bark_tts",
         "edge_tts",
         "piper_tts",
+        "qwen3_tts_realtime",
         "cosyvoice_tts",
         "cosyvoice2_tts",
         "melo_tts",
@@ -475,6 +515,9 @@ class TTSConfig(I18nMixin):
     bark_tts: Optional[BarkTTSConfig] = Field(None, alias="bark_tts")
     edge_tts: Optional[EdgeTTSConfig] = Field(None, alias="edge_tts")
     piper_tts: Optional[PiperTTSConfig] = Field(None, alias="piper_tts")
+    qwen3_tts_realtime: Optional[Qwen3TTSRealtimeConfig] = Field(
+        None, alias="qwen3_tts_realtime"
+    )
     cosyvoice_tts: Optional[CosyvoiceTTSConfig] = Field(None, alias="cosyvoice_tts")
     cosyvoice2_tts: Optional[Cosyvoice2TTSConfig] = Field(None, alias="cosyvoice2_tts")
     melo_tts: Optional[MeloTTSConfig] = Field(None, alias="melo_tts")
@@ -500,6 +543,10 @@ class TTSConfig(I18nMixin):
         "bark_tts": Description(en="Configuration for Bark TTS", zh="Bark TTS 配置"),
         "edge_tts": Description(en="Configuration for Edge TTS", zh="Edge TTS 配置"),
         "piper_tts": Description(en="Configuration for Piper TTS", zh="Piper TTS 配置"),
+        "qwen3_tts_realtime": Description(
+            en="Configuration for Qwen3 realtime TTS",
+            zh="Qwen3 实时语音配置",
+        ),
         "cosyvoice_tts": Description(
             en="Configuration for Cosyvoice TTS", zh="Cosyvoice TTS 配置"
         ),
@@ -543,6 +590,12 @@ class TTSConfig(I18nMixin):
             values.edge_tts.model_validate(values.edge_tts.model_dump())
         elif tts_model == "piper_tts" and values.piper_tts is not None:
             values.piper_tts.model_validate(values.piper_tts.model_dump())
+        elif (
+            tts_model == "qwen3_tts_realtime" and values.qwen3_tts_realtime is not None
+        ):
+            values.qwen3_tts_realtime.model_validate(
+                values.qwen3_tts_realtime.model_dump()
+            )
         elif tts_model == "cosyvoice_tts" and values.cosyvoice_tts is not None:
             values.cosyvoice_tts.model_validate(values.cosyvoice_tts.model_dump())
         elif tts_model == "cosyvoice2_tts" and values.cosyvoice2_tts is not None:

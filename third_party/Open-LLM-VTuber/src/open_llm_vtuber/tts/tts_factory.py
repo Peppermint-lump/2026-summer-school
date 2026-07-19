@@ -30,6 +30,25 @@ class TTSFactory:
                 model_path=kwargs.get("model_path"),
                 timeout_seconds=kwargs.get("timeout_seconds", 60),
             )
+        elif engine_type == "qwen3_tts_realtime":
+            from .qwen3_tts_realtime import TTSEngine as Qwen3RealtimeTTSEngine
+
+            return Qwen3RealtimeTTSEngine(
+                api_key=kwargs.get("api_key", ""),
+                model=kwargs.get("model", "qwen3-tts-flash-realtime"),
+                voice=kwargs.get("voice", "Cherry"),
+                url=kwargs.get(
+                    "url", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+                ),
+                language_type=kwargs.get("language_type", "Auto"),
+                sample_rate=kwargs.get("sample_rate", 24000),
+                timeout_seconds=kwargs.get("timeout_seconds", 30),
+                fallback_model_path=kwargs.get(
+                    "fallback_model_path",
+                    "models/piper/zh_CN-huayan-medium.onnx",
+                ),
+                fallback_timeout_seconds=kwargs.get("fallback_timeout_seconds", 60),
+            )
         elif engine_type == "pyttsx3_tts":
             from .pyttsx3_tts import TTSEngine as Pyttsx3TTSEngine
 

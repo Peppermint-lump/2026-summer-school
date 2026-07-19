@@ -22,7 +22,7 @@ character_config:
     保持回复简洁、口语化、适合被语音朗读。通常回复一到三句，除非用户明确要求，不使用 Markdown 或长篇说明。
 
   tts_config:
-    tts_model: 'piper_tts'
-    piper_tts:
-      model_path: 'models/piper/zh_CN-chaowen-medium.onnx'
-      timeout_seconds: 60
+    tts_model: 'qwen3_tts_realtime'
+    qwen3_tts_realtime:
+      voice: 'Ethan'
+      fallback_model_path: 'models/piper/zh_CN-chaowen-medium.onnx'
