@@ -191,6 +191,8 @@ Live2D 一个保守的表情或动作建议，但不能冒充跨模态融合结�
 | emotion API 全部失败 | 普通文字对话 | 不阻断陪伴回复 |
 
 输出 TTS 属于角色回复后的声音合成，不是用户的 audio emotion 输入，两者不要混淆。
+当前输出链路由 `TTS_MODEL=qwen3_tts_realtime` 和 `DASHSCOPE_API_KEY` 配置；
+云端不可用时才由本地 Piper 在同一条回复内接管。
 
 ## 7. 当前代码位置
 
