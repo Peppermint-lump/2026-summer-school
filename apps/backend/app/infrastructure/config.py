@@ -1,0 +1,304 @@
+"""Load validated application configuration and resolve secrets at the edge."""
+
+from __future__ import annotations
+
+import os
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any, cast
+
+import yaml
+
+from packages.schemas import (
+    AppConfig,
+    AudioAnalysisConfig,
+    CameraCaptureConfig,
+    FusionConfig,
+    TextAnalysisConfig,
+    VideoAnalysisConfig,
+)
+
+
+class ConfigError(ValueError):
+    """Raised when local application configuration is missing or invalid."""
+
+
+class EnvironmentSecretStore:
+    def __init__(self, environment: Mapping[str, str] | None = None) -> None:
+        self._environment = os.environ if environment is None else environment
+
+    def get_required(self, name: str) -> str:
+        value = self._environment.get(name)
+        if not value:
+            raise ConfigError(
+                f"required secret environment variable is missing: {name}"
+            )
+        return value
+
+
+def load_app_config(
+    path: Path,
+    *,
+    repository_root: Path,
+    environment: Mapping[str, str] | None = None,
+) -> AppConfig:
+    effective_environment = os.environ if environment is None else environment
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ConfigError(f"configuration file cannot be read: {path}") from exc
+    except yaml.YAMLError as exc:
+        raise ConfigError("configuration file is not valid YAML") from exc
+    if not isinstance(raw, dict):
+        raise ConfigError("configuration root must be a mapping")
+
+    root = cast(dict[str, Any], raw)
+    capture = _mapping(root, "capture")
+    camera = _mapping(capture, "camera")
+    emotion = _mapping(root, "emotion")
+    video = _mapping(emotion, "video")
+    audio = _mapping(emotion, "audio")
+    text = _mapping(emotion, "text")
+    fusion = _mapping(root, "fusion")
+    video_prompt_path = _resolve_prompt_path(
+        repository_root, _string(video, "prompt_path"), modality="video"
+    )
+    audio_prompt_path = _resolve_prompt_path(
+        repository_root, _string(audio, "prompt_path"), modality="audio"
+    )
+    text_prompt_path = _resolve_prompt_path(
+        repository_root, _string(text, "prompt_path"), modality="text"
+    )
+
+    try:
+        return AppConfig(
+            camera=CameraCaptureConfig(
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "CAMERA_ENABLED",
+                    default=_boolean(camera, "enabled"),
+                ),
+                device_index=_integer(camera, "device_index"),
+                width=_integer(camera, "width"),
+                height=_integer(camera, "height"),
+                target_fps=_number(camera, "target_fps"),
+                buffer_seconds=_number(camera, "buffer_seconds"),
+                sample_fps=_number(camera, "sample_fps"),
+                max_sampled_frames=_integer(camera, "max_sampled_frames"),
+                retain_media=_boolean(camera, "retain_media"),
+            ),
+            video_emotion=VideoAnalysisConfig(
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "VIDEO_EMOTION_ENABLED",
+                    default=_boolean(video, "enabled"),
+                ),
+                provider=_environment_string(
+                    effective_environment,
+                    "VIDEO_EMOTION_PROVIDER",
+                    default=_string(video, "provider"),
+                ),
+                model=_environment_string(
+                    effective_environment,
+                    "MIMO_MODEL",
+                    default=_string(video, "model"),
+                ),
+                base_url=_environment_string(
+                    effective_environment,
+                    "MIMO_BASE_URL",
+                    default=_string(video, "base_url"),
+                ),
+                api_key_secret_name=_string(video, "api_key_secret_name"),
+                timeout_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_EMOTION_TIMEOUT_SECONDS",
+                    default=_number(video, "timeout_seconds"),
+                ),
+                max_retries=_integer(video, "max_retries"),
+                prompt_path=video_prompt_path,
+                prompt_version=_string(video, "prompt_version"),
+                minimum_quality=_number(video, "minimum_quality"),
+                action_minimum_confidence=_number(video, "action_minimum_confidence"),
+                action_emotion_weight=_number(video, "action_emotion_weight"),
+                continuous_enabled=_environment_boolean(
+                    effective_environment,
+                    "VIDEO_CONTINUOUS_ENABLED",
+                    default=_boolean(video, "continuous_enabled"),
+                ),
+                continuous_window_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_CONTINUOUS_WINDOW_SECONDS",
+                    default=_number(video, "continuous_window_seconds"),
+                ),
+                continuous_interval_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_CONTINUOUS_INTERVAL_SECONDS",
+                    default=_number(video, "continuous_interval_seconds"),
+                ),
+                action_cooldown_seconds=_environment_number(
+                    effective_environment,
+                    "VIDEO_ACTION_COOLDOWN_SECONDS",
+                    default=_number(video, "action_cooldown_seconds"),
+                ),
+            ),
+            audio_emotion=AudioAnalysisConfig(
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "AUDIO_EMOTION_ENABLED",
+                    default=_boolean(audio, "enabled"),
+                ),
+                provider=_environment_string(
+                    effective_environment,
+                    "AUDIO_EMOTION_PROVIDER",
+                    default=_string(audio, "provider"),
+                ),
+                model=_environment_string(
+                    effective_environment,
+                    "MIMO_MODEL",
+                    default=_string(audio, "model"),
+                ),
+                base_url=_environment_string(
+                    effective_environment,
+                    "MIMO_BASE_URL",
+                    default=_string(audio, "base_url"),
+                ),
+                api_key_secret_name=_string(audio, "api_key_secret_name"),
+                timeout_seconds=_environment_number(
+                    effective_environment,
+                    "AUDIO_EMOTION_TIMEOUT_SECONDS",
+                    default=_number(audio, "timeout_seconds"),
+                ),
+                max_retries=_integer(audio, "max_retries"),
+                prompt_path=audio_prompt_path,
+                prompt_version=_string(audio, "prompt_version"),
+                minimum_quality=_number(audio, "minimum_quality"),
+                max_media_bytes=_integer(audio, "max_media_bytes"),
+            ),
+            text_emotion=TextAnalysisConfig(
+                enabled=_environment_boolean(
+                    effective_environment,
+                    "TEXT_EMOTION_ENABLED",
+                    default=_boolean(text, "enabled"),
+                ),
+                provider=_environment_string(
+                    effective_environment,
+                    "TEXT_EMOTION_PROVIDER",
+                    default=_string(text, "provider"),
+                ),
+                model=_environment_string(
+                    effective_environment,
+                    "GLM_TEXT_EMOTION_MODEL",
+                    default=_string(text, "model"),
+                ),
+                base_url=_environment_string(
+                    effective_environment,
+                    "GLM_BASE_URL",
+                    default=_string(text, "base_url"),
+                ),
+                api_key_secret_name=_string(text, "api_key_secret_name"),
+                timeout_seconds=_environment_number(
+                    effective_environment,
+                    "TEXT_EMOTION_TIMEOUT_SECONDS",
+                    default=_number(text, "timeout_seconds"),
+                ),
+                max_retries=_integer(text, "max_retries"),
+                prompt_path=text_prompt_path,
+                prompt_version=_string(text, "prompt_version"),
+            ),
+            fusion=FusionConfig(
+                reliable_threshold=_number(fusion, "reliable_threshold"),
+                positive_threshold=_number(fusion, "positive_threshold"),
+                negative_threshold=_number(fusion, "negative_threshold"),
+                text_weight=_number(fusion, "text_weight"),
+                audio_weight=_number(fusion, "audio_weight"),
+                video_weight=_number(fusion, "video_weight"),
+            ),
+        )
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+
+
+def _mapping(value: Mapping[str, Any], key: str) -> dict[str, Any]:
+    child = value.get(key)
+    if not isinstance(child, dict):
+        raise ConfigError(f"configuration '{key}' must be a mapping")
+    return cast(dict[str, Any], child)
+
+
+def _resolve_prompt_path(
+    repository_root: Path, configured_path: str, *, modality: str
+) -> Path:
+    prompt_path = (repository_root / configured_path).resolve()
+    try:
+        prompt_path.relative_to(repository_root.resolve())
+    except ValueError as exc:
+        raise ConfigError(f"{modality} prompt_path escapes the repository") from exc
+    if not prompt_path.is_file():
+        raise ConfigError(f"configured {modality} prompt does not exist")
+    return prompt_path
+
+
+def _string(value: Mapping[str, Any], key: str) -> str:
+    result = value.get(key)
+    if not isinstance(result, str) or not result:
+        raise ConfigError(f"configuration '{key}' must be a non-empty string")
+    return result
+
+
+def _boolean(value: Mapping[str, Any], key: str) -> bool:
+    result = value.get(key)
+    if not isinstance(result, bool):
+        raise ConfigError(f"configuration '{key}' must be a boolean")
+    return result
+
+
+def _integer(value: Mapping[str, Any], key: str) -> int:
+    result = value.get(key)
+    if isinstance(result, bool) or not isinstance(result, int):
+        raise ConfigError(f"configuration '{key}' must be an integer")
+    return result
+
+
+def _number(value: Mapping[str, Any], key: str) -> float:
+    result = value.get(key)
+    if isinstance(result, bool) or not isinstance(result, (int, float)):
+        raise ConfigError(f"configuration '{key}' must be a number")
+    return float(result)
+
+
+def _environment_string(
+    environment: Mapping[str, str], key: str, *, default: str
+) -> str:
+    result = environment.get(key, default).strip()
+    if not result:
+        raise ConfigError(f"environment variable '{key}' must be non-empty")
+    return result
+
+
+def _environment_boolean(
+    environment: Mapping[str, str], key: str, *, default: bool
+) -> bool:
+    raw_value = environment.get(key)
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigError(f"environment variable '{key}' must be a boolean")
+
+
+def _environment_number(
+    environment: Mapping[str, str], key: str, *, default: float
+) -> float:
+    raw_value = environment.get(key)
+    if raw_value is None:
+        return default
+    try:
+        result = float(raw_value.strip())
+    except ValueError as exc:
+        raise ConfigError(f"environment variable '{key}' must be a number") from exc
+    if result <= 0:
+        raise ConfigError(f"environment variable '{key}' must be positive")
+    return result

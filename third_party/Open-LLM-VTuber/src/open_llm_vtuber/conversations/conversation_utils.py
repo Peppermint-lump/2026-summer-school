@@ -14,6 +14,8 @@ from ..asr.asr_interface import ASRInterface
 from ..live2d_model import Live2dModel
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
+from ..companion_input_safety import add_visual_unavailable_context
+from ..emotion_middleware_client import apply_emotion_context
 
 
 # Convert class methods to standalone functions
@@ -24,9 +26,15 @@ def create_batch_input(
     metadata: Optional[Dict[str, Any]] = None,
 ) -> BatchInput:
     """Create batch input for agent processing"""
+    agent_input_text = add_visual_unavailable_context(input_text, metadata)
+    agent_input_text = apply_emotion_context(agent_input_text, metadata)
     return BatchInput(
         texts=[
-            TextData(source=TextSource.INPUT, content=input_text, from_name=from_name)
+            TextData(
+                source=TextSource.INPUT,
+                content=agent_input_text,
+                from_name=from_name,
+            )
         ],
         images=[
             ImageData(

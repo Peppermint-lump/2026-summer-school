@@ -95,20 +95,23 @@ The application:
 2. requests microphone permission;
 3. optionally requests camera permission;
 4. loads the Live2D avatar;
-5. waits for the user to speak;
-6. creates one interaction turn from speech start to speech end;
-7. obtains:
+5. when camera permission has been granted and visual analysis is enabled,
+   continuously samples bounded visual windows and independently updates the
+   avatar from video-only observations;
+6. waits for the user to speak;
+7. creates one interaction turn from speech start to speech end;
+8. obtains:
    - ASR transcript;
    - audio-only emotion observation;
    - video-only emotion observation;
    - text-only emotion observation;
-8. computes modality reliability;
-9. detects consistency or conflict;
-10. selects a companion strategy;
-11. generates a reply;
-12. plays TTS;
-13. drives Live2D lip sync and expression;
-14. removes temporary media unless retention is explicitly enabled.
+9. computes modality reliability;
+10. detects consistency or conflict;
+11. selects a companion strategy;
+12. generates a reply;
+13. plays TTS;
+14. drives Live2D lip sync and expression;
+15. removes temporary media unless retention is explicitly enabled.
 
 The application must remain usable when the camera is disabled.
 
@@ -210,13 +213,24 @@ Xiaohudie special motions must remain visible for their complete presentation wi
 
 Natural completion must transition back to the captured standing baseline over 500 ms before restarting `Idle`. A newer special-motion request may interrupt this transition and replace the previous motion immediately.
 
+The canonical `observe` motion is a bounded, model-local fallback for a
+high-confidence non-still visible action without an authored motion, including
+`other`. For Xiaohudie it performs a
+short left/right look by changing `ParamAngleY` and `ParamBodyAngleY`, restores the
+captured baseline, and restarts `Idle`. It is not an inferred semantic action, must
+not generate speech, and must not interrupt an authored special motion.
+
 The local scene background automatically follows local time:
 
 - `06:00` through `16:59`: daytime MP4 background;
 - `17:00` through `05:59`: nighttime MP4 background;
 - video backgrounds loop silently and use cover scaling without changing aspect ratio.
 
-The original purchased model files are immutable local backup assets.
+The original purchased model files are immutable local backup assets. The
+project owner has confirmed that the Xiaohudie and Felix runtime copies may be
+tracked in this repository for development and testing; this exception does not
+authorize redistribution through other repositories or standalone asset
+packages.
 
 The selectable Felix runtime must include:
 
@@ -299,7 +313,21 @@ Output:
 - optional fine emotion;
 - confidence;
 - visible evidence;
+- standardized observed actions from the ordered frame sequence;
 - face/video quality.
+
+Observed actions remain part of the video modality. They must not be counted as
+an additional independent modality. A deterministic, bounded mapping may use a
+high-confidence action as weak video-emotion evidence; semantic actions such as
+head shaking must not be treated as proof of a negative internal state.
+
+A text-only submission must retain truthful zero-duration speech timing and attach
+a separate recent visual alignment window (three seconds by default). The GLM
+text observer and MiMo video observer analyze their independent inputs in the same
+turn, after which deterministic fusion produces the authoritative emotion,
+strategy, expression, and conflict result. A continuous-video result must not be
+reused merely because it is the latest result when its captured window does not
+match the text submission.
 
 ---
 
@@ -329,6 +357,18 @@ Canonical reliability:
 ```text
 reliability = confidence × quality
 ```
+
+For the final emotion summary, deterministic fusion computes a normalized
+reliability-weighted sum:
+
+```text
+weighted_score = Σ(label_score × modality_weight × reliability)
+                 / Σ(modality_weight × reliability)
+```
+
+where positive is `+1`, neutral is `0`, and negative is `-1`. Uncertain or
+unreliable observations do not contribute. Fewer than two reliable modalities
+must produce `insufficient_evidence`, not a strong final label.
 
 This is an engineering heuristic, not a calibrated psychological probability.
 
@@ -438,11 +478,14 @@ Example forbidden style:
 ### Default
 
 - camera processing is opt-in;
+- after the user enables camera processing, a visible in-app indicator remains
+  active while bounded visual windows are analyzed periodically;
 - raw audio/video is temporary;
 - temporary files are deleted after inference;
 - conversation and media are not retained by default;
 - logs store metadata, not raw media;
-- provider uploads are limited to the current turn;
+- provider uploads are limited to the current interaction turn or the current
+  bounded continuous-visual window;
 - user-facing settings must allow disabling video analysis.
 
 ### Debug mode
@@ -531,12 +574,20 @@ The Windows MVP is accepted when:
 6. the camera can be enabled and disabled;
 7. one user turn yields aligned audio and video artifacts internally;
 8. text, audio, and video emotion providers return canonical schemas;
-9. low-quality video does not cause strong conflict;
-10. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
-11. provider failure degrades to ordinary conversation;
-12. temporary media is removed by default;
-13. secrets are not present in the repository or renderer;
-14. the app exits without leaving backend processes running.
+9. ordered video frames can report a standardized action such as `wave` without
+   creating a fourth modality;
+10. a high-confidence non-still action without an authored motion can produce one
+    neutral `observe` fallback
+    without inventing action semantics or triggering speech;
+11. a typed turn can fuse its text observation with an independently analyzed
+    recent visual window, while continuous video cannot overwrite its fused
+    expression during the active reply;
+12. low-quality video does not cause strong conflict;
+13. a verbal-positive / behavioral-negative test triggers `gentle_check_in`;
+14. provider failure degrades to ordinary conversation;
+15. temporary media is removed by default;
+16. secrets are not present in the repository or renderer;
+17. the app exits without leaving backend processes running.
 
 ---
 
@@ -576,7 +627,7 @@ Provider-generated confidence must not be reported as calibrated accuracy.
 
 ## 20. Explicitly out of scope for MVP
 
-- continuous full-duplex multimodal streaming;
+- continuous full-duplex audio/video transport to one joint model;
 - training a new multimodal foundation model;
 - fine-tuning MiMo, Qwen, or GLM;
 - persistent psychological profiles;
@@ -590,6 +641,6 @@ Provider-generated confidence must not be reported as calibrated accuracy.
 - automatic cloud account provisioning;
 - autonomous emergency escalation;
 - arbitrary Live2D motion generation;
-- public redistribution of purchased avatar assets.
+- redistribution of purchased avatar assets outside the owner-approved repository and runtime use.
 
 These may be considered only after the MVP is accepted.

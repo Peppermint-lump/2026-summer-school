@@ -14,6 +14,26 @@
 - Expected behavior: Open-LLM-VTuber can resolve `live2d_model_name: xiaohudie` to `/live2d-models/xiaohudie/runtime/xiaohudie.model3.json`.
 - Validation: `xiaohudie.model3.json` parses successfully, all referenced runtime files exist, and `conf.yaml` validates with `live2d_model_name: xiaohudie`.
 
+### Nested runtime model discovery
+
+- Reason: upstream `/live2d-models/info` assumed the flat path `<name>/<name>.model3.json`; the approved Xiaohudie and Felix assets use registered nested runtime paths, and Felix's model file is named `wd66.model3.json`.
+- Upstream files: `src/open_llm_vtuber/routes.py`; `src/open_llm_vtuber/live2d_discovery.py`.
+- Expected behavior: the model list resolves each local `model_dict.json` URL, rejects paths escaping `live2d-models/`, and retains compatibility with the original flat layout.
+- Regression test: `tests/test_live2d_model_discovery.py` covers Xiaohudie, Felix, legacy flat models, and path traversal rejection.
+
+### Configuration validation secret redaction
+
+- Reason: upstream logged the complete parsed configuration after validation
+  failures, which could expose environment-substituted provider credentials.
+- Upstream file and function:
+  `src/open_llm_vtuber/config_manager/utils.py::validate_config`.
+- Expected behavior: validation errors retain the field path, message, and error
+  type, but omit input values, the full configuration, and the original
+  Pydantic exception chain.
+- Validation: pass an invalid configuration containing a sentinel secret and
+  verify the captured log output contains the validation error but not the
+  sentinel.
+
 ### Xiaohudie runtime asset adaptation
 
 - Reason: VTube Studio expressions and hotkey motions were toggle-style and could remain active or overlap in Open-LLM-VTuber.
@@ -26,9 +46,104 @@
 - Resource adaptation: `scripts/prepare_xiaohudie_one_shot_motions.py` changes only `Meta.Loop` to `false` for Greeting, CatchButterfly, and HoldBear. Their authored curves and durations remain unchanged; parameter restoration belongs to the frontend lifecycle controller.
 - Validation: `xiaohudie.model3.json` parses successfully, all referenced runtime files exist, expressions cover the expected toggle parameters, and non-idle motions have `Loop: false`.
 
-Apart from the narrowly scoped silent-TTS patch documented below, no other upstream Python source patches have been applied.
+Apart from the narrowly scoped patches documented below, project-specific behavior
+should be added through adapters under `apps/backend/app/integration/` whenever
+possible.
 
-Project-specific behavior should be added through adapters under `apps/backend/app/integration/` unless a narrow upstream patch is unavoidable.
+### Companion raw-image boundary
+
+- Reason: the bundled frontend attaches camera snapshots to ordinary text turns,
+  while this project's canonical companion model is text-only and must receive
+  normalized observations rather than raw media. Forwarding the snapshot caused
+  the GLM endpoint to reject the complete turn.
+- Upstream files and functions:
+  `src/open_llm_vtuber/conversations/conversation_handler.py::handle_conversation_trigger`;
+  `src/open_llm_vtuber/conversations/conversation_utils.py::create_batch_input`;
+  `src/open_llm_vtuber/companion_input_safety.py`.
+- Expected behavior: raw camera images are discarded before the companion call;
+  the text turn continues with a private guardrail that prevents the companion
+  from claiming it saw the user. Logs contain only the discarded image count.
+- Regression test: `tests/test_companion_input_safety.py` verifies discard,
+  metadata preservation, and text-only fallback context.
+
+### Canonical three-modality middleware adapter
+
+- Reason: the upstream conversation path previously sent microphone audio only to
+  ASR and let the companion GLM choose expressions. The project contract requires
+  independent GLM text observation, MiMo raw-audio observation, MiMo ordered-frame
+  observation, deterministic fusion, and an authoritative Live2D state.
+- Upstream files and functions:
+  `src/open_llm_vtuber/emotion_middleware_client.py`;
+  `conversations/single_conversation.py::process_single_conversation`;
+  `conversations/conversation_utils.py::create_batch_input`;
+  `frontend/avatar-state-bridge.js`; `frontend/index.html`.
+- Expected behavior: after ASR, the adapter sends transcript and raw WAV in separate
+  request fields to the authenticated loopback application boundary. The canonical
+  backend keeps them isolated at provider calls, returns a normalized observation
+  summary plus authoritative expression/motion, and fails open when unavailable.
+  Raw media is never sent to GLM and is deleted after the three analysis tasks end.
+- Regression validation: adapter payload/PCM tests, loopback authentication tests,
+  middleware lifecycle tests, and a live microphone turn with metadata traces under
+  `runtime/debug/emotion_turns/`.
+
+### Continuous video-only avatar updates
+
+- Reason: upstream camera preview does not perform canonical visual inference and
+  visual analysis previously ran only after a text or microphone turn. The product
+  requires visible actions to affect the avatar even when the user is silent.
+- Upstream files and functions:
+  `src/open_llm_vtuber/emotion_middleware_client.py::latest_visual`;
+  `src/open_llm_vtuber/websocket_handler.py::_monitor_visual_emotion`;
+  `frontend/avatar-state-bridge.js`.
+- Expected behavior: one canonical backend worker analyzes ordered three-second
+  video-only windows every two seconds. Connected clients poll only metadata and
+  receive new `emotion-analysis` and `avatar-state` messages. `wave` immediately
+  drives `Greeting`; a high-confidence non-still action without an authored Live2D
+  motion drives one neutral `Observe` event.
+  Repeated identical events are edge-triggered and also respect a five-second
+  cooldown. This path
+  never invokes chat, ASR, audio emotion, or TTS. The browser “直播” view remains a
+  debug preview and is not used as provider input.
+- Frontend fallback: `frontend/avatar-motion-controller.js::playObserveMotion`
+  randomly looks left or right first, crosses to the other side, restores the full
+  parameter/part baseline, and restarts Idle. It preserves the active expression and
+  never interrupts Greeting, CatchButterfly, or HoldBear.
+- Regression tests: `tests/test_emotion_middleware_client.py` validates monotonic
+  sequence parsing and the `observe` contract;
+  `tests/test_continuous_visual_motion.py` validates edge/cooldown gating;
+  `tests/test_avatar_motion_controller.js` validates motion, restoration, and Idle.
+
+### Typed-turn visual alignment and fused-expression arbitration
+
+- Reason: a typed input has no audio duration, so using its speech interval for
+  frame selection produced a zero-length video window. Continuous visual results
+  then moved the avatar independently but did not participate in the typed turn's
+  deterministic emotion fusion.
+- Upstream files: `src/open_llm_vtuber/emotion_middleware_client.py`;
+  `src/open_llm_vtuber/websocket_handler.py`; `frontend/avatar-state-bridge.js`.
+- Expected behavior: a typed request keeps truthful zero-duration speech bounds and
+  sends a separate three-second visual window. GLM text and MiMo video observations
+  are fused by the canonical backend. While the conversation task is active,
+  continuous video still emits motion but sends no expression index, preserving the
+  fused expression through the reply lifecycle. Discarding the browser's raw image
+  no longer injects a contradictory "visual unavailable" prompt when that turn has
+  a successful canonical video observation; failed or insufficient video still
+  degrades to the safety prompt.
+- Regression tests: `tests/test_emotion_middleware_client.py` validates typed/audio
+  timing and canonical visual availability; `tests/test_continuous_visual_motion.py`
+  validates expression suppression; the repository safety tests validate both
+  visual-observed and visual-unavailable prompt paths.
+
+### Cached service-context log redaction
+
+- Reason: verbose startup expanded the complete environment-substituted character
+  configuration, including provider credentials.
+- Upstream file and function:
+  `src/open_llm_vtuber/service_context.py::ServiceContext.load_cache`.
+- Expected behavior: debug logs include only configuration UID, character name,
+  and Live2D model name. Provider configuration and credentials are never logged.
+- Validation: start the server with `--verbose` and verify the cached-context line
+  contains only those three allowlisted identifiers.
 
 ### Silent-TTS expression dispatch
 
@@ -91,7 +206,9 @@ Project-specific behavior should be added through adapters under `apps/backend/a
 ## Felix selectable character
 
 - Upstream files: `model_dict.json`, `characters/felix.yaml`, `frontend/avatar-motion-controller.js`.
-- Local runtime files: `live2d-models/felix/runtime/` (private and Git-ignored).
+- Runtime files: `live2d-models/felix/runtime/` (tracked only under the
+  repository-scoped owner authorization recorded in `AGENTS.md` and `SSOT.md`;
+  redistribution outside that scope remains excluded).
 - Reason: register the locally supplied Felix model as a second selectable character while keeping Xiaohudie as the default.
 - Adaptation: the runtime `wd66.model3.json` registers the supplied expression presets and `ParamMouthOpenY`; only emotion-safe presets are exposed through `emotionMap`. Outfit, prop, and pose toggles remain available to the model but are not selected by the LLM.
 - Persona and voice isolation: `felix_001` contains Felix's identity and speaking style and selects the Qwen male `Ethan` voice. Xiaohudie keeps the Qwen female `Cherry` voice. Felix uses the local `zh_CN-chaowen-medium` Piper fallback and Xiaohudie uses `zh_CN-huayan-medium`.

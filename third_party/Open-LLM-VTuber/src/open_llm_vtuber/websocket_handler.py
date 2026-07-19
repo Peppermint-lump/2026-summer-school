@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Callable, TypedDict
 from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
 import json
+import os
 from enum import Enum
 import numpy as np
 from loguru import logger
@@ -26,6 +27,10 @@ from .conversations.conversation_handler import (
     handle_conversation_trigger,
     handle_group_interrupt,
     handle_individual_interrupt,
+)
+from .emotion_middleware_client import (
+    EmotionMiddlewareClient,
+    EmotionMiddlewareResult,
 )
 
 
@@ -58,6 +63,36 @@ class WSMessage(TypedDict, total=False):
     display_text: Optional[dict]
 
 
+def _cooldown_motion(
+    motion: str,
+    *,
+    now: float,
+    previous_event_motion: Optional[str],
+    last_emitted_at: Dict[str, float],
+    cooldown_seconds: float,
+) -> tuple[str, Optional[str], Dict[str, float]]:
+    """Edge-trigger and cool down non-idle visual motion events."""
+    if motion not in {"greeting", "observe"}:
+        return motion, None, last_emitted_at
+    if motion == previous_event_motion:
+        return "idle", motion, last_emitted_at
+    previous_time = last_emitted_at.get(motion, float("-inf"))
+    if now - previous_time < cooldown_seconds:
+        return "idle", motion, last_emitted_at
+    updated = dict(last_emitted_at)
+    updated[motion] = now
+    return motion, motion, updated
+
+
+def _visual_expression_index(
+    expression_indices: List[int], *, conversation_active: bool
+) -> Optional[int]:
+    """Protect the authoritative fused expression while a turn is active."""
+    if conversation_active or not expression_indices:
+        return None
+    return expression_indices[0]
+
+
 class WebSocketHandler:
     """Handles WebSocket connections and message routing"""
 
@@ -67,6 +102,7 @@ class WebSocketHandler:
         self.client_contexts: Dict[str, ServiceContext] = {}
         self.chat_group_manager = ChatGroupManager()
         self.current_conversation_tasks: Dict[str, Optional[asyncio.Task]] = {}
+        self.visual_monitor_tasks: Dict[str, asyncio.Task] = {}
         self.default_context_cache = default_context_cache
         self.received_data_buffers: Dict[str, np.ndarray] = {}
 
@@ -121,6 +157,11 @@ class WebSocketHandler:
 
             await self._send_initial_messages(
                 websocket, client_uid, session_service_context
+            )
+            self.visual_monitor_tasks[client_uid] = asyncio.create_task(
+                self._monitor_visual_emotion(
+                    websocket, client_uid, session_service_context
+                )
             )
 
             logger.info(f"Connection established for client {client_uid}")
@@ -314,6 +355,7 @@ class WebSocketHandler:
 
         logger.info(f"Client {client_uid} disconnected")
         message_handler.cleanup_client(client_uid)
+        self._cancel_visual_monitor(client_uid)
 
     async def _cleanup_failed_connection(self, client_uid: str) -> None:
         """Clean up failed connection data"""
@@ -329,6 +371,107 @@ class WebSocketHandler:
             self.current_conversation_tasks.pop(client_uid, None)
 
         message_handler.cleanup_client(client_uid)
+        self._cancel_visual_monitor(client_uid)
+
+    def _cancel_visual_monitor(self, client_uid: str) -> None:
+        task = self.visual_monitor_tasks.pop(client_uid, None)
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _monitor_visual_emotion(
+        self,
+        websocket: WebSocket,
+        client_uid: str,
+        context: ServiceContext,
+    ) -> None:
+        """Push independent continuous-video results without invoking chat."""
+        client = EmotionMiddlewareClient.from_environment()
+        if client is None:
+            return
+        sequence = 0
+        previous_event_motion: Optional[str] = None
+        last_emitted_at: Dict[str, float] = {}
+        cooldown_seconds = float(os.environ.get("VIDEO_ACTION_COOLDOWN_SECONDS", "5"))
+        try:
+            while self.client_connections.get(client_uid) is websocket:
+                update = await client.latest_visual(after_sequence=sequence)
+                if update is not None:
+                    sequence, result = update
+                    now = asyncio.get_running_loop().time()
+                    motion, previous_event_motion, last_emitted_at = _cooldown_motion(
+                        result.motion,
+                        now=now,
+                        previous_event_motion=previous_event_motion,
+                        last_emitted_at=last_emitted_at,
+                        cooldown_seconds=cooldown_seconds,
+                    )
+                    conversation_task = self.current_conversation_tasks.get(client_uid)
+                    conversation_active = (
+                        conversation_task is not None and not conversation_task.done()
+                    )
+                    await self._send_visual_emotion(
+                        websocket,
+                        context,
+                        result,
+                        motion=motion,
+                        conversation_active=conversation_active,
+                    )
+                await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            raise
+        except (RuntimeError, WebSocketDisconnect, ValueError):
+            return
+
+    async def _send_visual_emotion(
+        self,
+        websocket: WebSocket,
+        context: ServiceContext,
+        result: EmotionMiddlewareResult,
+        *,
+        motion: str,
+        conversation_active: bool,
+    ) -> None:
+        expression_indices = context.live2d_model.extract_emotion(
+            f"[{result.expression}]"
+        )[:1]
+        expression_index = _visual_expression_index(
+            expression_indices,
+            conversation_active=conversation_active,
+        )
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "type": "emotion-analysis",
+                    "source": "continuous-video",
+                    "turn_id": result.turn_id,
+                    "analysis": result.payload.get("analysis"),
+                    "avatar_state": result.payload.get("avatar_state"),
+                    "trace_directory": result.trace_directory,
+                },
+                ensure_ascii=False,
+            )
+        )
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "type": "avatar-state",
+                    "source": "continuous-video",
+                    "turn_id": result.turn_id,
+                    "expression": result.expression,
+                    "expression_index": expression_index,
+                    "expression_suppressed": conversation_active,
+                    "motion": motion,
+                }
+            )
+        )
+        logger.info(
+            "Continuous visual update turn={} expression={} expression_suppressed={} motion={} trace={}",
+            result.turn_id,
+            result.expression,
+            conversation_active,
+            motion,
+            result.trace_directory or "disabled",
+        )
 
     async def broadcast_to_group(
         self, group_members: list[str], message: dict, exclude_uid: str = None

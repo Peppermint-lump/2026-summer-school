@@ -1,5 +1,5 @@
-import os
 import json
+from pathlib import Path
 from uuid import uuid4
 import numpy as np
 from datetime import datetime
@@ -10,6 +10,7 @@ from loguru import logger
 from .service_context import ServiceContext
 from .websocket_handler import WebSocketHandler
 from .proxy_handler import ProxyHandler
+from .live2d_discovery import discover_live2d_characters
 
 
 def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
@@ -96,40 +97,15 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
     @router.get("/live2d-models/info")
     async def get_live2d_folder_info():
         """Get information about available Live2D models"""
-        live2d_dir = "live2d-models"
-        if not os.path.exists(live2d_dir):
+        live2d_dir = Path("live2d-models")
+        if not live2d_dir.exists():
             return JSONResponse(
                 {"error": "Live2D models directory not found"}, status_code=404
             )
-
-        valid_characters = []
-        supported_extensions = [".png", ".jpg", ".jpeg"]
-
-        for entry in os.scandir(live2d_dir):
-            if entry.is_dir():
-                folder_name = entry.name.replace("\\", "/")
-                model3_file = os.path.join(
-                    live2d_dir, folder_name, f"{folder_name}.model3.json"
-                ).replace("\\", "/")
-
-                if os.path.isfile(model3_file):
-                    # Find avatar file if it exists
-                    avatar_file = None
-                    for ext in supported_extensions:
-                        avatar_path = os.path.join(
-                            live2d_dir, folder_name, f"{folder_name}{ext}"
-                        )
-                        if os.path.isfile(avatar_path):
-                            avatar_file = avatar_path.replace("\\", "/")
-                            break
-
-                    valid_characters.append(
-                        {
-                            "name": folder_name,
-                            "avatar": avatar_file,
-                            "model_path": model3_file,
-                        }
-                    )
+        valid_characters = discover_live2d_characters(
+            live2d_dir,
+            Path("model_dict.json"),
+        )
         return JSONResponse(
             {
                 "type": "live2d-models/info",

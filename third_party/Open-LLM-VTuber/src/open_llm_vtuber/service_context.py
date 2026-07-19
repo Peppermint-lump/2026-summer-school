@@ -244,7 +244,13 @@ class ServiceContext:
             self.character_config.agent_config.agent_settings.basic_memory_agent.mcp_enabled_servers,
         )
 
-        logger.debug(f"Loaded service context with cache: {character_config}")
+        logger.debug(
+            "Loaded service context with cache: conf_uid={}, character={}, "
+            "live2d_model={}",
+            character_config.conf_uid,
+            character_config.character_name,
+            character_config.live2d_model_name,
+        )
 
     async def load_from_config(self, config: Config) -> None:
         """

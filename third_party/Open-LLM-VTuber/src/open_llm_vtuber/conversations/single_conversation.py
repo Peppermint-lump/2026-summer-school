@@ -17,6 +17,11 @@ from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
 from ..chat_history_manager import store_message
 from ..service_context import ServiceContext
+from ..emotion_middleware_client import (
+    EmotionMiddlewareClient,
+    EmotionMiddlewareResult,
+    canonical_visual_observation_available,
+)
 
 # Import necessary types from agent outputs
 from ..agent.output_types import SentenceOutput, AudioOutput
@@ -48,16 +53,75 @@ async def process_single_conversation(
     # Create TTSTaskManager for this conversation
     tts_manager = TTSTaskManager()
     full_response = ""  # Initialize full_response here
+    emotion_result: Optional[EmotionMiddlewareResult] = None
+    emotion_action_applied = False
 
     try:
         # Send initial signals
         await send_conversation_start_signals(websocket_send)
         logger.info(f"New Conversation Chain {session_emoji} started!")
 
+        # Preserve raw audio only long enough to call the independent audio observer.
+        raw_audio = user_input.copy() if isinstance(user_input, np.ndarray) else None
+
         # Process user input
         input_text = await process_user_input(
             user_input, context.asr_engine, websocket_send
         )
+
+        emotion_client = EmotionMiddlewareClient.from_environment()
+        if emotion_client is not None:
+            emotion_result = await emotion_client.analyze(
+                session_id=client_uid,
+                transcript=input_text,
+                raw_audio=raw_audio,
+            )
+        raw_audio = None
+        if emotion_result is not None:
+            avatar_expression_indices = context.live2d_model.extract_emotion(
+                f"[{emotion_result.expression}]"
+            )[:1]
+            metadata = dict(metadata or {})
+            metadata["emotion_companion_context"] = emotion_result.companion_context
+            metadata["canonical_visual_observation_available"] = (
+                canonical_visual_observation_available(emotion_result.payload)
+            )
+            metadata["authoritative_expression"] = emotion_result.expression
+            metadata["authoritative_motion"] = emotion_result.motion
+            logger.info(
+                "Emotion middleware completed turn={} expression={} motion={} trace={}",
+                emotion_result.turn_id,
+                emotion_result.expression,
+                emotion_result.motion,
+                emotion_result.trace_directory or "disabled",
+            )
+            await websocket_send(
+                json.dumps(
+                    {
+                        "type": "emotion-analysis",
+                        "turn_id": emotion_result.turn_id,
+                        "analysis": emotion_result.payload.get("analysis"),
+                        "avatar_state": emotion_result.payload.get("avatar_state"),
+                        "trace_directory": emotion_result.trace_directory,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            await websocket_send(
+                json.dumps(
+                    {
+                        "type": "avatar-state",
+                        "turn_id": emotion_result.turn_id,
+                        "expression": emotion_result.expression,
+                        "expression_index": (
+                            avatar_expression_indices[0]
+                            if avatar_expression_indices
+                            else None
+                        ),
+                        "motion": emotion_result.motion,
+                    }
+                )
+            )
 
         # Create batch input
         batch_input = create_batch_input(
@@ -101,6 +165,15 @@ async def process_single_conversation(
                     await websocket_send(json.dumps(output_item))
 
                 elif isinstance(output_item, (SentenceOutput, AudioOutput)):
+                    if emotion_result is not None:
+                        output_item.actions.expressions = None
+                        if not emotion_action_applied:
+                            expressions = context.live2d_model.extract_emotion(
+                                f"[{emotion_result.expression}]"
+                            )
+                            if expressions:
+                                output_item.actions.expressions = expressions[:1]
+                            emotion_action_applied = True
                     # Handle SentenceOutput or AudioOutput
                     response_part = await process_agent_output(
                         output=output_item,

@@ -2,10 +2,12 @@
 .env
 .env.*
 !.env.example
+configs/app.local.yaml
 
 # Python and tooling
 __pycache__/
 *.py[cod]
+*.egg-info/
 .tools/
 .pytest_cache/
 .ruff_cache/
@@ -54,11 +56,3 @@ third_party/Open-LLM-VTuber/backgrounds/xiaohudie-night.mp4
 Thumbs.db
 .idea/
 .vscode/
-tests/
-!/tests/
-/tests/*
-!/tests/avatar-motion-controller.test.cjs
-!/tests/avatar-lipsync-controller.test.cjs
-!/tests/test_qwen3_tts_realtime.py
-!/tests/test_openai_compatible_llm_latency.py
-!/tests/test_xiaohudie_expression_mapping.py

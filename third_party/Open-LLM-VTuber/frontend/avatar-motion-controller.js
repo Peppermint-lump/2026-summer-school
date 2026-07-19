@@ -22,6 +22,9 @@
     HoldBear: 3000,
   });
   const IDLE_TRANSITION_DURATION_MS = 500;
+  const OBSERVE_DURATION_MS = 2400;
+  const OBSERVE_HEAD_PARAMETER = "ParamAngleY";
+  const OBSERVE_BODY_PARAMETER = "ParamBodyAngleY";
   const IDLE_GROUP = "Idle";
   const NEUTRAL_EXPRESSION = "neutral";
   const INVALID_MOTION_HANDLE = -1;
@@ -31,6 +34,29 @@
     if (window.localStorage.getItem(DEBUG_KEY) === "true") {
       console.debug(`[Live2D] ${message}`, details || "");
     }
+  }
+
+  function smoothstep(progress) {
+    const value = Math.max(0, Math.min(progress, 1));
+    return value * value * (3 - 2 * value);
+  }
+
+  function interpolate(from, to, progress) {
+    return from + (to - from) * smoothstep(progress);
+  }
+
+  function observeHeadOffset(progress, direction) {
+    if (progress < 0.25) {
+      return interpolate(0, direction * 12, progress / 0.25);
+    }
+    if (progress < 0.6) {
+      return interpolate(
+        direction * 12,
+        direction * -12,
+        (progress - 0.25) / 0.35,
+      );
+    }
+    return interpolate(direction * -12, 0, (progress - 0.6) / 0.4);
   }
 
   function chooseWeightedMotion(hitArea, tapMotions) {
@@ -534,6 +560,99 @@
       this.baseline = null;
       this.transitionTo("idle", "natural motion completion");
       debug("idle started", { reason: "natural motion completion" });
+    }
+
+    playObserveMotion() {
+      const core = this.model && this.model._model;
+      if (!core || !this.originalStartTapMotion) {
+        return;
+      }
+      if (this.activeSpecialMotion) {
+        if (this.activeSpecialMotion.group === "Observe") {
+          debug("repeated observe motion ignored", this.describeActiveMotion());
+        } else {
+          debug("observe motion deferred behind special motion", {
+            activeMotion: this.describeActiveMotion(),
+          });
+        }
+        return;
+      }
+
+      const headIndex = core.getParameterIndex(OBSERVE_HEAD_PARAMETER);
+      const bodyIndex = core.getParameterIndex(OBSERVE_BODY_PARAMETER);
+      if (headIndex < 0 || headIndex >= core.getParameterCount()) {
+        debug("observe motion unavailable", { reason: "ParamAngleY missing" });
+        return;
+      }
+
+      this.cancelActiveSpecialMotion({
+        reason: "starting Observe",
+        resetParameters: true,
+        startIdle: false,
+      });
+      this.baseline = this.captureBaseline();
+      if (!this.baseline) {
+        return;
+      }
+      this.stopMotionQueue("starting Observe");
+      const token = ++this.motionToken;
+      const startedAt = performance.now();
+      const direction = Math.random() < 0.5 ? -1 : 1;
+      const active = {
+        token,
+        group: "Observe",
+        index: 0,
+        queueHandle: null,
+        expectedDurationMs: OBSERVE_DURATION_MS,
+        minimumDisplayDurationMs: OBSERVE_DURATION_MS,
+        requestTime: startedAt,
+        startedAt,
+        animationFrame: null,
+        resolveCompletion: null,
+        resolveTransition: null,
+        completionHold: null,
+      };
+      this.activeSpecialMotion = active;
+      this.transitionTo("observe-motion", "starting Observe");
+      debug("observe motion requested", { token, direction });
+
+      const renderObserveFrame = () => {
+        if (token !== this.motionToken || this.activeSpecialMotion !== active) {
+          return;
+        }
+        const elapsedMs = performance.now() - startedAt;
+        const progress = Math.min(elapsedMs / OBSERVE_DURATION_MS, 1);
+        const headOffset = observeHeadOffset(progress, direction);
+        this.applySnapshot(this.baseline);
+        core.setParameterValueByIndex(
+          headIndex,
+          this.baseline.parameters[headIndex] + headOffset,
+        );
+        if (bodyIndex >= 0 && bodyIndex < core.getParameterCount()) {
+          core.setParameterValueByIndex(
+            bodyIndex,
+            this.baseline.parameters[bodyIndex] + headOffset * 0.25,
+          );
+        }
+        core.saveParameters();
+
+        if (progress < 1) {
+          active.animationFrame = window.requestAnimationFrame(
+            renderObserveFrame,
+          );
+          return;
+        }
+
+        active.animationFrame = null;
+        this.applySnapshot(this.baseline);
+        this.activeSpecialMotion = null;
+        this.baseline = null;
+        this.model.startRandomMotion(IDLE_GROUP, MOTION_PRIORITY.IDLE);
+        this.transitionTo("idle", "Observe completed");
+        debug("observe motion completed", { token, elapsedMs });
+      };
+
+      active.animationFrame = window.requestAnimationFrame(renderObserveFrame);
     }
 
     destroy(reason) {

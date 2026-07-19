@@ -248,6 +248,7 @@ emotion/
 ├── video/
 │   ├── preprocess.py
 │   ├── face_quality.py
+│   ├── action_emotion.py
 │   └── service.py
 └── text/
     ├── quality.py
@@ -259,6 +260,8 @@ Rules:
 - provider implementations do not know fusion logic;
 - audio service does not receive transcript;
 - video service does not receive transcript or audio labels;
+- standardized actions remain nested video observations and are blended only
+  inside the video service with a bounded deterministic weight;
 - text service receives transcript only;
 - all provider payloads are normalized before leaving `emotion`.
 
@@ -271,6 +274,10 @@ Owns:
 - conflict classification;
 - conflict score;
 - insufficient-evidence rules.
+
+The final label score is a normalized weighted sum of canonical label score,
+configured modality weight, and reliability. The fusion layer never treats an
+observed action as an independent modality.
 
 Structure:
 
@@ -488,6 +495,15 @@ transcript ──────────────┤
 ```
 
 Text, audio, and video analysis should run concurrently after their inputs are ready.
+
+### 8.1 Continuous video-only observation
+
+After explicit camera consent, one backend worker periodically analyzes a bounded
+ordered-frame window. It sends neither transcript nor audio to the video provider.
+The latest canonical video observation is published to connected VTuber clients,
+which update Live2D immediately without waiting for a speech or text turn. The
+worker is single-instance, skips overlapping runs, retains no raw frames after
+inference, and stops with the backend.
 
 ---
 
@@ -883,6 +899,18 @@ The avatar mapper translates canonical states to model expressions.
 Conflict scenarios default to neutral or mild concern behavior. They must not automatically trigger strong crying or anger expressions.
 
 Special motions are separate from emotion states.
+
+Canonical visual-event motions are deterministic and bounded: `wave` may select
+`greeting`, while a high-confidence non-still action without an authored motion may
+select the neutral `observe` fallback. `observe` must preserve the selected expression, must not trigger a
+companion reply, and yields to authored special motions before returning to Idle.
+
+For a typed turn, `speech_start_ms == speech_end_ms` remains truthful. Optional
+`visual_start_ms` and `visual_end_ms` identify the recent camera window associated
+with the submission. Text GLM and video MiMo run independently over those inputs;
+their canonical observations meet only in deterministic fusion. While the reply
+task is active, continuous-video events may drive motion but their expression index
+is suppressed so the turn-fused expression remains authoritative.
 
 The Idle motion remains active where supported because it drives crying/sleepy loop parameters.
 

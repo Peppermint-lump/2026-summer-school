@@ -26,7 +26,9 @@ The local runtime config is:
 third_party/Open-LLM-VTuber/conf.yaml
 ```
 
-It is intentionally ignored by Git because it may contain local provider settings and secrets. The current generated config is based on `config_templates/conf.default.yaml` with the server host changed to `127.0.0.1`.
+It is intentionally ignored by Git. Provider secrets belong only in the
+repository-root `.env`; the generated config contains environment references,
+not credential values. See `docs/model-api-configuration.md`.
 
 ## Run in development
 
@@ -42,11 +44,38 @@ Then run:
 .\scripts\start-open-llm-vtuber.ps1
 ```
 
+On macOS/Linux, validate and start through the environment-aware adapter:
+
+```bash
+third_party/Open-LLM-VTuber/.venv/bin/python scripts/start_open_llm_vtuber.py --check-only
+third_party/Open-LLM-VTuber/.venv/bin/python scripts/start_open_llm_vtuber.py
+```
+
 The default development endpoint is:
 
 ```text
 http://127.0.0.1:12393
 ```
+
+The same launcher also starts the authenticated canonical emotion middleware at
+`http://127.0.0.1:18765`. Its token is generated per process and passed only via
+the child-process environment. Set `CAMERA_ENABLED=false` to keep the camera
+closed; audio and text turns continue normally.
+
+When `CAMERA_ENABLED=true`, `VIDEO_EMOTION_ENABLED=true`, and
+`VIDEO_CONTINUOUS_ENABLED=true`, the launcher automatically starts independent
+video-only analysis. No microphone, text message, preview click, or analysis
+button is required. The browser “直播” pane is only a local preview.
+
+Metadata-only per-turn traces are written to:
+
+```text
+runtime/debug/emotion_turns/<turn_id>/
+```
+
+For live browser diagnostics, `window.__lastEmotionAnalysis` contains the most
+recent canonical result and `window.__lastAvatarState` contains the dispatched
+Live2D state. Neither object contains raw media or credentials.
 
 On first startup, the default `sherpa_onnx_asr` setting may download the SenseVoice model into:
 
@@ -98,4 +127,5 @@ VAD speech end
 -> Live2D
 ```
 
-Future integration code belongs under `apps/backend/app/integration/`.
+Canonical orchestration remains under `apps/backend/app/integration/`; the
+upstream checkout contains only the documented loopback and frontend adapters.
