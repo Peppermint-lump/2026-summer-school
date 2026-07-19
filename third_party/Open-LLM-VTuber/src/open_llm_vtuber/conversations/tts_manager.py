@@ -23,6 +23,9 @@ class TTSTaskManager:
         self._payload_queue: asyncio.Queue[Dict] = asyncio.Queue()
         # Task to handle sending payloads in order
         self._sender_task: Optional[asyncio.Task] = None
+        # Some providers need reply-scoped state, such as a sticky fallback
+        # after one sentence segment fails.
+        self._turn_tts_engine: Optional[TTSInterface] = None
         # Counter for maintaining order
         self._sequence_counter = 0
         self._next_sequence_to_send = 0
@@ -66,6 +69,13 @@ class TTSTaskManager:
             f"🏃Queuing TTS task for: '''{tts_text}''' (by {display_text.name})"
         )
 
+        if self._turn_tts_engine is None:
+            create_turn_engine = getattr(tts_engine, "create_turn_engine", None)
+            self._turn_tts_engine = (
+                create_turn_engine() if callable(create_turn_engine) else tts_engine
+            )
+        turn_tts_engine = self._turn_tts_engine
+
         # Get current sequence number
         current_sequence = self._sequence_counter
         self._sequence_counter += 1
@@ -83,7 +93,7 @@ class TTSTaskManager:
                 display_text=display_text,
                 actions=actions,
                 live2d_model=live2d_model,
-                tts_engine=tts_engine,
+                tts_engine=turn_tts_engine,
                 sequence_number=current_sequence,
             )
         )
@@ -182,5 +192,6 @@ class TTSTaskManager:
             self._sender_task.cancel()
         self._sequence_counter = 0
         self._next_sequence_to_send = 0
+        self._turn_tts_engine = None
         # Create a new queue to clear any pending items
         self._payload_queue = asyncio.Queue()

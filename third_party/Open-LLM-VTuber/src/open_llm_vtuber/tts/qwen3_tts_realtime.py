@@ -16,6 +16,51 @@ from .piper_tts import TTSEngine as PiperTTSEngine
 from .tts_interface import TTSInterface
 
 
+QWEN_FALLBACK_EXCEPTIONS = (
+    asyncio.TimeoutError,
+    OSError,
+    RuntimeError,
+    ValueError,
+    websockets.WebSocketException,
+)
+
+
+class _TurnConsistentTTSEngine(TTSInterface):
+    """Keep Qwen/Piper routing stable for all segments in one reply."""
+
+    def __init__(self, parent: "TTSEngine") -> None:
+        self._parent = parent
+        self._lock = asyncio.Lock()
+        self._fallback_active = not parent.api_key
+
+    async def async_generate_audio(
+        self, text: str, file_name_no_ext: str | None = None
+    ) -> str:
+        # Sentence tasks start concurrently. Serial provider selection ensures
+        # that one failure is visible before the next segment chooses an engine.
+        async with self._lock:
+            if self._fallback_active:
+                return await self._parent.fallback_engine.async_generate_audio(
+                    text, file_name_no_ext
+                )
+
+            try:
+                return await self._parent._generate_qwen_audio(text, file_name_no_ext)
+            except QWEN_FALLBACK_EXCEPTIONS as exc:
+                self._fallback_active = True
+                logger.warning(
+                    "Qwen3 realtime TTS failed ({}); using Piper for the rest "
+                    "of this reply.",
+                    exc,
+                )
+                return await self._parent.fallback_engine.async_generate_audio(
+                    text, file_name_no_ext
+                )
+
+    def generate_audio(self, text: str, file_name_no_ext: str | None = None) -> str:
+        return asyncio.run(self.async_generate_audio(text, file_name_no_ext))
+
+
 class TTSEngine(TTSInterface):
     """Qwen3 realtime TTS client with a local Piper fallback."""
 
@@ -46,6 +91,14 @@ class TTSEngine(TTSInterface):
             model_path=(fallback_model_path or "models/piper/zh_CN-huayan-medium.onnx"),
             timeout_seconds=fallback_timeout_seconds,
         )
+
+    def create_turn_engine(self) -> TTSInterface:
+        """Create isolated routing state for one assistant reply."""
+        if not self.api_key:
+            logger.warning(
+                "DASHSCOPE_API_KEY is not configured; using local Piper TTS fallback."
+            )
+        return _TurnConsistentTTSEngine(self)
 
     @staticmethod
     def _url_with_model(url: str, model: str) -> str:
@@ -144,13 +197,7 @@ class TTSEngine(TTSInterface):
 
         try:
             return await self._generate_qwen_audio(text, file_name_no_ext)
-        except (
-            asyncio.TimeoutError,
-            OSError,
-            RuntimeError,
-            ValueError,
-            websockets.WebSocketException,
-        ) as exc:
+        except QWEN_FALLBACK_EXCEPTIONS as exc:
             logger.warning(
                 "Qwen3 realtime TTS failed ({}); using local Piper fallback.",
                 exc,

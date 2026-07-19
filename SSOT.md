@@ -153,7 +153,7 @@ The MVP is not considered blocked by incomplete macOS packaging if the Windows d
 
 - Open-LLM-VTuber VAD and ASR path.
 - SenseVoice / sherpa-onnx as the initial ASR stack.
-- Alibaba Model Studio `qwen3-tts-flash-realtime` as the primary TTS provider, with local Piper voices as the automatic offline/error fallback.
+- Alibaba Model Studio `qwen3-tts-flash-realtime` as the primary TTS provider, with local Piper voices as the automatic offline/error fallback. A provider failure activates Piper for the remainder of the current reply; the next reply retries Qwen.
 - GLM API for:
   - text-only emotion classification;
   - companion reply generation.

@@ -40,6 +40,27 @@ class VtuberConfigurationError(ValueError):
     """Raised when the safe VTuber environment contract is incomplete."""
 
 
+def prepare_emotion_config(repository_root: Path) -> Path:
+    """Create the ignored local emotion config once from the safe example."""
+    config_directory = repository_root / "configs"
+    local_path = config_directory / "app.local.yaml"
+    if local_path.exists():
+        return local_path
+
+    example_path = config_directory / "app.example.yaml"
+    if not example_path.is_file():
+        raise VtuberConfigurationError(
+            "emotion configuration template is missing: configs/app.example.yaml"
+        )
+    try:
+        shutil.copyfile(example_path, local_path)
+    except OSError as exc:
+        raise VtuberConfigurationError(
+            "emotion configuration could not be initialized"
+        ) from exc
+    return local_path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verbose", action="store_true")
@@ -56,7 +77,7 @@ def prepare_vtuber_config(
     upstream_root: Path,
     environment: MutableMapping[str, str],
 ) -> Path:
-    """Prepare ignored upstream config with secret references, never secret values."""
+    """Prepare the ignored upstream config from env or an existing local config."""
     required = (
         "GLM_API_KEY",
         "GLM_BASE_URL",
@@ -64,15 +85,21 @@ def prepare_vtuber_config(
         "VTUBER_LLM_PROVIDER",
         "LIVE2D_DEFAULT_MODEL",
     )
-    missing = [name for name in required if not environment.get(name, "").strip()]
-    if missing:
-        raise VtuberConfigurationError(
-            "fill the following variables in .env: " + ", ".join(missing)
-        )
-    if environment["VTUBER_LLM_PROVIDER"] != "zhipu_llm":
-        raise VtuberConfigurationError(
-            "VTUBER_LLM_PROVIDER must remain zhipu_llm for the SSOT GLM binding"
-        )
+    use_environment_config = any(
+        environment.get(name, "").strip() for name in required
+    )
+    if use_environment_config:
+        missing = [
+            name for name in required if not environment.get(name, "").strip()
+        ]
+        if missing:
+            raise VtuberConfigurationError(
+                "fill the following variables in .env: " + ", ".join(missing)
+            )
+        if environment["VTUBER_LLM_PROVIDER"] != "zhipu_llm":
+            raise VtuberConfigurationError(
+                "VTUBER_LLM_PROVIDER must remain zhipu_llm for the SSOT GLM binding"
+            )
 
     config_path = upstream_root / "conf.yaml"
     if not config_path.exists():
@@ -96,19 +123,22 @@ def prepare_vtuber_config(
     system = _mapping(config, "system_config")
     system["host"] = "127.0.0.1"
     character = _mapping(config, "character_config")
-    character["live2d_model_name"] = "${LIVE2D_DEFAULT_MODEL}"
     agent = _mapping(character, "agent_config")
     settings = _mapping(_mapping(agent, "agent_settings"), "basic_memory_agent")
-    settings["llm_provider"] = "${VTUBER_LLM_PROVIDER}"
     llm_configs = _mapping(agent, "llm_configs")
     zhipu = _mapping(llm_configs, "zhipu_llm")
-    zhipu.update(
-        {
-            "base_url": "${GLM_BASE_URL}",
-            "llm_api_key": "${GLM_API_KEY}",
-            "model": "${GLM_COMPANION_MODEL}",
-        }
-    )
+    if use_environment_config:
+        character["live2d_model_name"] = "${LIVE2D_DEFAULT_MODEL}"
+        settings["llm_provider"] = "${VTUBER_LLM_PROVIDER}"
+        zhipu.update(
+            {
+                "base_url": "${GLM_BASE_URL}",
+                "llm_api_key": "${GLM_API_KEY}",
+                "model": "${GLM_COMPANION_MODEL}",
+            }
+        )
+    else:
+        _validate_existing_vtuber_config(character, settings, zhipu)
 
     try:
         config_path.write_text(
@@ -120,6 +150,38 @@ def prepare_vtuber_config(
             "Open-LLM-VTuber configuration could not be updated"
         ) from exc
     return config_path
+
+
+def _validate_existing_vtuber_config(
+    character: dict[str, Any],
+    settings: dict[str, Any],
+    zhipu: dict[str, Any],
+) -> None:
+    """Validate legacy ignored conf.yaml values without exposing credentials."""
+    provider = settings.get("llm_provider")
+    if provider != "zhipu_llm":
+        raise VtuberConfigurationError(
+            "conf.yaml basic_memory_agent.llm_provider must remain zhipu_llm"
+        )
+
+    required_fields = {
+        "character_config.live2d_model_name": character.get("live2d_model_name"),
+        "zhipu_llm.llm_api_key": zhipu.get("llm_api_key"),
+        "zhipu_llm.model": zhipu.get("model"),
+    }
+    missing = [
+        name
+        for name, value in required_fields.items()
+        if not isinstance(value, str)
+        or not value.strip()
+        or value.strip().startswith("${")
+    ]
+    if missing:
+        raise VtuberConfigurationError(
+            "configure these values in conf.yaml or provide the complete .env "
+            "contract: "
+            + ", ".join(missing)
+        )
 
 
 def _mapping(parent: dict[str, Any], key: str) -> dict[str, Any]:
@@ -147,10 +209,13 @@ def start_emotion_backend(port: int) -> subprocess.Popen[bytes]:
     token = secrets.token_urlsafe(32)
     os.environ["EMOTION_BACKEND_TOKEN"] = token
     os.environ["EMOTION_BACKEND_URL"] = f"http://127.0.0.1:{port}"
+    config_path = prepare_emotion_config(REPOSITORY_ROOT)
     process = subprocess.Popen(
         [
             str(_root_python()),
             str(REPOSITORY_ROOT / "scripts" / "start_emotion_backend.py"),
+            "--config",
+            str(config_path),
             "--port",
             str(port),
         ],
@@ -195,6 +260,7 @@ def main() -> int:
     try:
         load_project_environment(REPOSITORY_ROOT)
         prepare_vtuber_config(UPSTREAM_ROOT, os.environ)
+        prepare_emotion_config(REPOSITORY_ROOT)
     except (DotEnvError, VtuberConfigurationError) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

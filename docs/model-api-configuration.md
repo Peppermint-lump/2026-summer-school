@@ -111,9 +111,24 @@ On Windows:
 .\scripts\start-open-llm-vtuber.ps1 -SkipSync
 ```
 
+Run the script once without `-SkipSync` after cloning or changing root
+dependencies. It creates both the Python 3.12 root environment used by the
+emotion middleware and the separate Open-LLM-VTuber environment. Subsequent
+starts may use `-SkipSync`.
+
+On first start, the launcher also copies the safe disabled-by-default
+`configs/app.example.yaml` to the ignored `configs/app.local.yaml`. Existing
+local emotion configuration is never overwritten.
+
 The launcher loads `.env`, keeps `127.0.0.1` binding, and writes only
-`${GLM_API_KEY}`-style references to the ignored upstream `conf.yaml`. Existing
-process environment values take precedence over `.env` values.
+`${GLM_API_KEY}`-style references to the ignored upstream `conf.yaml` when the
+complete five-variable VTuber environment contract is present. For backward
+compatibility, when all five variables are absent it validates and preserves the
+existing ignored `conf.yaml` GLM/model settings. A partial environment contract
+is rejected instead of mixing configuration sources. Existing process
+environment values take precedence over `.env` values. `DASHSCOPE_API_KEY` is
+independent and enables Qwen3 realtime TTS; when absent, the configured Piper
+fallback remains available.
 
 ## Local model files still needed
 

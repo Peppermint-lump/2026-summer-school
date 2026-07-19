@@ -15,6 +15,7 @@ $templatePath = Join-Path $upstreamDir "config_templates\conf.default.yaml"
 $localUv = Join-Path $repoRoot ".tools\uv\bin\uv.exe"
 $uvCacheDir = Join-Path $repoRoot ".tools\uv-cache"
 $uvToolDir = Join-Path $repoRoot ".tools\uv-tools"
+$rootVenvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
 $venvPython = Join-Path $upstreamDir ".venv\Scripts\python.exe"
 $pythonLauncher = Join-Path $repoRoot "scripts\start_open_llm_vtuber.py"
 
@@ -50,11 +51,28 @@ $config = $config -replace "(?m)^(\s*mode_checkbox_group:\s*).*$", "`$1''"
 $config = $config -replace "(?m)^(\s*sft_dropdown:\s*).*$", "`$1''"
 Set-Content -NoNewline -Encoding utf8 -LiteralPath $configPath -Value $config
 
+$env:UV_CACHE_DIR = $uvCacheDir
+$env:UV_TOOL_DIR = $uvToolDir
+
+if (-not $SkipSync) {
+    Push-Location $repoRoot
+    try {
+        & $uv sync --python 3.12
+        if ($LASTEXITCODE -ne 0) {
+            throw "Root project uv sync failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+if (-not $CheckOnly -and -not (Test-Path -LiteralPath $rootVenvPython)) {
+    throw "Root Python environment is missing at $rootVenvPython. Run without -SkipSync first."
+}
+
 Push-Location $upstreamDir
 try {
-    $env:UV_CACHE_DIR = $uvCacheDir
-    $env:UV_TOOL_DIR = $uvToolDir
-
     if (-not $SkipSync) {
         & $uv sync
         if ($LASTEXITCODE -ne 0) {
