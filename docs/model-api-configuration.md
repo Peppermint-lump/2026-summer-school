@@ -18,6 +18,12 @@ QWEN_API_KEY=
 GLM_API_KEY=
 ```
 
+For companion reply speech, also fill the independent Qwen3 TTS credential:
+
+```dotenv
+DASHSCOPE_API_KEY=
+```
+
 Do not paste keys into `configs/*.yaml`, Open-LLM-VTuber `conf.yaml`, source code,
 logs, screenshots, or chat messages.
 
@@ -31,7 +37,7 @@ logs, screenshots, or chat messages.
 | Text-only emotion | `GLM_TEXT_EMOTION_MODEL` | `GLM_API_KEY` | Implemented |
 | Companion response | `GLM_COMPANION_MODEL` | `GLM_API_KEY` | Open-LLM-VTuber connection configured |
 | Speech recognition | `ASR_MODEL=sherpa_onnx_asr` | None | Local |
-| Speech synthesis | `TTS_MODEL=piper_tts` | None | Local voice files still required |
+| Speech synthesis | `TTS_MODEL=qwen3_tts_realtime` | `DASHSCOPE_API_KEY` | Implemented; Piper is fallback-only |
 
 `TEXT_EMOTION_TIMEOUT_SECONDS`, `AUDIO_EMOTION_TIMEOUT_SECONDS`, and
 `VIDEO_EMOTION_TIMEOUT_SECONDS` control independent Provider latency budgets.
@@ -126,9 +132,13 @@ complete five-variable VTuber environment contract is present. For backward
 compatibility, when all five variables are absent it validates and preserves the
 existing ignored `conf.yaml` GLM/model settings. A partial environment contract
 is rejected instead of mixing configuration sources. Existing process
-environment values take precedence over `.env` values. `DASHSCOPE_API_KEY` is
-independent and enables Qwen3 realtime TTS; when absent, the configured Piper
-fallback remains available.
+environment values take precedence over `.env` values. When `TTS_MODEL` is
+configured, the launcher selects Qwen3 realtime TTS and writes only
+the `${XIAOHUDIE_TTS_MODEL_PATH}` reference to the ignored YAML; it never writes
+resolved secrets. The Qwen engine reads `DASHSCOPE_API_KEY` directly from the
+process environment. This reply-output TTS is independent from MiMo audio
+emotion and ASR. A missing key or cloud failure uses Piper only as the
+configured fallback.
 
 ## Local model files still needed
 

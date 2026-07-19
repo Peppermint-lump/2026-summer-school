@@ -137,6 +137,7 @@ def prepare_vtuber_config(
                 "model": "${GLM_COMPANION_MODEL}",
             }
         )
+        _configure_tts_from_environment(character, environment)
     else:
         _validate_existing_vtuber_config(character, settings, zhipu)
 
@@ -150,6 +151,55 @@ def prepare_vtuber_config(
             "Open-LLM-VTuber configuration could not be updated"
         ) from exc
     return config_path
+
+
+def _configure_tts_from_environment(
+    character: dict[str, Any], environment: MutableMapping[str, str]
+) -> None:
+    """Bind companion reply synthesis to the explicit TTS environment contract."""
+    tts_model = environment.get("TTS_MODEL", "").strip()
+    if not tts_model:
+        return
+    if tts_model != "qwen3_tts_realtime":
+        raise VtuberConfigurationError(
+            "TTS_MODEL must select Qwen3 via qwen3_tts_realtime; "
+            "Piper is fallback-only"
+        )
+    fallback_path = environment.get("XIAOHUDIE_TTS_MODEL_PATH", "").strip()
+    if not fallback_path:
+        raise VtuberConfigurationError(
+            "fill XIAOHUDIE_TTS_MODEL_PATH when TTS_MODEL is configured"
+        )
+
+    tts_config = _mapping(character, "tts_config")
+    tts_config["tts_model"] = "${TTS_MODEL}"
+    piper = _mapping(tts_config, "piper_tts")
+    piper["model_path"] = "${XIAOHUDIE_TTS_MODEL_PATH}"
+    existing_qwen = tts_config.get("qwen3_tts_realtime")
+    if existing_qwen is None:
+        qwen: dict[str, Any] = {}
+        tts_config["qwen3_tts_realtime"] = qwen
+    elif isinstance(existing_qwen, dict):
+        qwen = cast(dict[str, Any], existing_qwen)
+    else:
+        raise VtuberConfigurationError(
+            "Open-LLM-VTuber config 'qwen3_tts_realtime' is invalid"
+        )
+    qwen.update(
+        {
+            # The engine reads DASHSCOPE_API_KEY directly. Keeping this blank
+            # also prevents an empty environment substitution becoming YAML null.
+            "api_key": "",
+            "model": "qwen3-tts-flash-realtime",
+            "voice": "Cherry",
+            "url": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+            "language_type": "Auto",
+            "sample_rate": 24000,
+            "timeout_seconds": 30,
+            "fallback_model_path": "${XIAOHUDIE_TTS_MODEL_PATH}",
+            "fallback_timeout_seconds": 60,
+        }
+    )
 
 
 def _validate_existing_vtuber_config(
